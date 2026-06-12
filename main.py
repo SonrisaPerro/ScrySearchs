@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI):
     # ---------------------------------
 
     index = load_index(INDEX_PATH)
-    model = SentenceTransformer(str(MODEL_DIR))
+    model = SentenceTransformer('clip-ViT-B-32')
 
     print(f"Backend ready! Loaded {index.ntotal} cards into memory.")
     yield
