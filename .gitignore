@@ -23,7 +23,6 @@ build/
 # Local data and model artifacts
 images/
 clip-model/
-*.faiss
 
 # IDE metadata
 .vscode/
