@@ -180,6 +180,10 @@ def blend_images(
             emb = model.encode([img], convert_to_numpy=True)
             if emb.ndim == 2:
                 emb = emb[0]
+                
+            # Normalize each vector BEFORE averaging
+            # This ensures no single image mathematically overpowers the blend
+            faiss.normalize_L2(np.asarray([emb], dtype="float32"))
             embeddings.append(emb)
         except Exception as e:
             print(f"Skipping {url}: {e}")
@@ -187,13 +191,15 @@ def blend_images(
     if not embeddings:
         raise HTTPException(status_code=400, detail="Failed to process images")
 
-    # The Vibe Math: Average the vectors together
+    # The Vibe Math: Average the normalized vectors together
     avg_embedding = np.mean(embeddings, axis=0)
     embedding_matrix = np.asarray([avg_embedding], dtype="float32")
+    
+    # Normalize the final averaged coordinate
     faiss.normalize_L2(embedding_matrix)
 
-    # Search FAISS with the new averaged vector
-    k = min(30, int(index.ntotal))
+    # Bump k to 50 so we have plenty of buffer when the frontend deletes the input cards
+    k = min(50, int(index.ntotal))
     distances, indices = index.search(embedding_matrix, k)
 
     results: List[Dict[str, Any]] = []
