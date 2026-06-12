@@ -670,7 +670,8 @@
             z-index: 1002;
             pointer-events: auto;
             will-change: transform;
-            animation: crawl 10s linear infinite;
+            animation: crawl 10s ease-in-out infinite;
+            filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.12));
             display: flex;
             align-items: center;
         }
@@ -678,6 +679,119 @@
         .crawler svg { display: block; width: 100%; height: auto; }
 
         .crawler:hover { animation-play-state: paused; transform: translateY(-4px); }
+
+        .crawler.hungry svg rect { fill: #ffcc99; }
+        .crawler.happy { animation-duration: 8s; }
+        .crawler.sleepy { animation-duration: 12s; opacity: 0.9; }
+        .crawler.hungry { animation-duration: 9s; }
+        .crawler.happy svg circle { fill: #ffefc2; }
+        .crawler.sleepy svg circle { fill: #c0e8ff; }
+
+        .pet-panel {
+            position: fixed;
+            bottom: 90px;
+            left: 1rem;
+            right: 1rem;
+            max-width: 700px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.92);
+            border: 3px solid var(--border-hard);
+            border-radius: 18px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            z-index: 1001;
+            padding: 14px 16px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            align-items: center;
+            font-family: 'Fredoka', sans-serif;
+        }
+
+        .pet-panel__name {
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--accent-purple);
+            letter-spacing: 0.02em;
+        }
+
+        .pet-panel__stats {
+            display: grid;
+            gap: 8px;
+        }
+
+        .pet-panel__actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            align-items: center;
+        }
+
+        .pet-btn {
+            background: linear-gradient(180deg, #ff9ae8 0%, #ff6ad6 100%);
+            border: none;
+            color: white;
+            padding: 10px 14px;
+            border-radius: 999px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            box-shadow: 0 6px 16px rgba(255, 105, 180, 0.25);
+        }
+
+        .pet-btn:hover { transform: translateY(-2px); }
+
+        .pet-btn.feed { background: linear-gradient(180deg, #00cc99 0%, #00aa77 100%); }
+
+        .stat {
+            display: grid;
+            gap: 4px;
+            font-size: 0.8rem;
+            color: var(--text);
+        }
+
+        .stat span { font-weight: 700; }
+
+        .meter {
+            width: 100%;
+            height: 10px;
+            border-radius: 999px;
+            background: #eaf4ff;
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        .meter > div {
+            height: 100%;
+            width: 0;
+            background: linear-gradient(90deg, #00d395, #00aa77);
+            border-radius: 999px;
+            transition: width 0.35s ease;
+        }
+
+        .pet-bubble {
+            grid-column: 1 / -1;
+            position: relative;
+            background: #fff0f8;
+            border: 2px solid #ff83d2;
+            padding: 10px 12px;
+            border-radius: 18px;
+            font-size: 0.9rem;
+            color: #4a254b;
+            box-shadow: 0 6px 20px rgba(255, 101, 167, 0.15);
+        }
+
+        .pet-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 18px;
+            width: 16px;
+            height: 16px;
+            background: #fff0f8;
+            border-right: 2px solid #ff83d2;
+            border-bottom: 2px solid #ff83d2;
+            transform: rotate(45deg);
+        }
 
         @keyframes crawl {
             0% { transform: translateX(-18vw) translateY(0); }
@@ -890,18 +1004,46 @@
 
     <!-- Cute crawler: walks across above the footer -->
     <div id="crawler" class="crawler" title="Friendly crawler">
-        <svg viewBox="0 0 120 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <svg viewBox="0 0 140 72" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <g>
-                <ellipse cx="28" cy="44" rx="14" ry="6" fill="#2b2b2b" opacity="0.15" />
-                <rect x="10" y="14" width="70" height="36" rx="12" fill="#ffcc99" stroke="#b36b00" stroke-width="2" />
-                <circle cx="36" cy="32" r="8" fill="#ffffff" />
-                <circle cx="36" cy="32" r="4" fill="#000" />
-                <path d="M66 38 q6 -6 10 0" stroke="#b36b00" stroke-width="3" fill="none" stroke-linecap="round"/>
-                <g transform="translate(82,36)">
-                    <rect x="0" y="-8" width="20" height="6" rx="2" fill="#ffcc99" stroke="#b36b00" stroke-width="2"/>
+                <ellipse cx="40" cy="58" rx="18" ry="7" fill="#2b2b2b" opacity="0.18" />
+                <rect x="10" y="14" width="90" height="42" rx="18" fill="#ffcc99" stroke="#b36b00" stroke-width="3" />
+                <circle cx="42" cy="32" r="8" fill="#ffffff" />
+                <circle cx="62" cy="32" r="8" fill="#ffffff" />
+                <circle cx="42" cy="32" r="3" fill="#000" />
+                <circle cx="62" cy="32" r="3" fill="#000" />
+                <circle cx="28" cy="40" r="4" fill="#ff9ec2" opacity="0.9" />
+                <circle cx="76" cy="40" r="4" fill="#ff9ec2" opacity="0.9" />
+                <path d="M42 44 q10 12 20 0" stroke="#b36b00" stroke-width="3" fill="none" stroke-linecap="round" />
+                <path d="M94 18 q8 -8 16 0" stroke="#ff5bb0" stroke-width="3" fill="none" opacity="0.8"/>
+                <g transform="translate(110,42) rotate(-15)">
+                    <rect x="0" y="-6" width="24" height="10" rx="5" fill="#ffcc99" stroke="#b36b00" stroke-width="2"/>
                 </g>
             </g>
         </svg>
+    </div>
+
+    <div class="pet-panel" id="petPanel">
+        <div class="pet-panel__stats">
+            <div class="pet-panel__name">Pet Name: <span id="petName">Tama-bot</span></div>
+            <div class="stat">
+                <span>Happiness</span>
+                <div class="meter"><div id="happinessMeter"></div></div>
+            </div>
+            <div class="stat">
+                <span>Energy</span>
+                <div class="meter"><div id="energyMeter"></div></div>
+            </div>
+            <div class="stat">
+                <span>Attention</span>
+                <div class="meter"><div id="attentionMeter"></div></div>
+            </div>
+            <div class="pet-bubble" id="petBubble">Hi! I'm your little page buddy. Tap feed or play to keep me happy.</div>
+        </div>
+        <div class="pet-panel__actions">
+            <button class="pet-btn feed" id="feedButton">Feed</button>
+            <button class="pet-btn" id="playButton">Play</button>
+        </div>
     </div>
 
     <div class="zoom-overlay" id="zoomOverlay">
@@ -931,9 +1073,25 @@
         const zoomImage = document.getElementById('zoomImage');
         const flipBtn = document.getElementById('flipBtn');
         const controlsContainer = document.getElementById('controlsContainer');
+        const petPanel = document.getElementById('petPanel');
+        const petBubble = document.getElementById('petBubble');
+        const happinessMeter = document.getElementById('happinessMeter');
+        const energyMeter = document.getElementById('energyMeter');
+        const attentionMeter = document.getElementById('attentionMeter');
+        const feedButton = document.getElementById('feedButton');
+        const playButton = document.getElementById('playButton');
+        const crawler = document.getElementById('crawler');
 
         let currentZoomCardData = null;
         let showingBackFace = false;
+        let petState = {
+            happiness: 80,
+            energy: 70,
+            attention: 65,
+            message: "Hi! I'm your little page buddy. Tap feed or play to keep me happy.",
+        };
+        const petMax = 100;
+        let petDecayInterval = null;
 
         // Prevent controls clicks from triggering file selector window
         controlsContainer.addEventListener('click', e => e.stopPropagation());
@@ -1166,6 +1324,71 @@
             
             showingBackFace = !showingBackFace;
         });
+
+        // -- PET / TAMAGOTCHI LOGIC --
+        function setMeterValue(element, value) {
+            element.style.width = `${Math.max(0, Math.min(petMax, value))}%`;
+        }
+
+        function updatePetMood() {
+            setMeterValue(happinessMeter, petState.happiness);
+            setMeterValue(energyMeter, petState.energy);
+            setMeterValue(attentionMeter, petState.attention);
+            petBubble.textContent = petState.message;
+
+            crawler.classList.toggle('happy', petState.happiness > 70 && petState.energy > 40);
+            crawler.classList.toggle('sleepy', petState.energy < 35);
+            crawler.classList.toggle('hungry', petState.happiness < 45 || petState.energy < 35);
+        }
+
+        function petAction(action) {
+            if (action === 'feed') {
+                petState.energy = Math.min(petMax, petState.energy + 25);
+                petState.happiness = Math.min(petMax, petState.happiness + 15);
+                petState.message = 'Yum! I feel energized and cozy. Keep the fun coming!';
+            }
+            if (action === 'play') {
+                petState.attention = Math.min(petMax, petState.attention + 20);
+                petState.happiness = Math.min(petMax, petState.happiness + 20);
+                petState.energy = Math.max(0, petState.energy - 15);
+                petState.message = 'Yay! Playing makes me happy. I love being your page friend!';
+            }
+            updatePetMood();
+        }
+
+        function decayPetState() {
+            petState.happiness = Math.max(0, petState.happiness - 1);
+            petState.energy = Math.max(0, petState.energy - 1);
+            petState.attention = Math.max(0, petState.attention - 0.7);
+
+            if (petState.energy < 20) {
+                petState.message = 'I am getting sleepy... maybe feed me soon?';
+            } else if (petState.attention < 25) {
+                petState.message = 'I want to play! Tap play and make me smile.';
+            } else if (petState.happiness < 30) {
+                petState.message = 'I miss you! Give me a snack or a game.';
+            } else {
+                petState.message = 'I am purring along while you explore cards!';
+            }
+            updatePetMood();
+        }
+
+        function startPetSimulation() {
+            if (petDecayInterval) return;
+            petDecayInterval = setInterval(decayPetState, 5000);
+        }
+
+        feedButton.addEventListener('click', () => petAction('feed'));
+        playButton.addEventListener('click', () => petAction('play'));
+        crawler.addEventListener('mouseenter', () => {
+            petState.happiness = Math.min(petMax, petState.happiness + 5);
+            petState.attention = Math.min(petMax, petState.attention + 5);
+            petState.message = 'Heehee! You touched me. I like that!';
+            updatePetMood();
+        });
+
+        updatePetMood();
+        startPetSimulation();
         // ============= REACTIVE BACKGROUND LOGIC =============
         
         // 1. Parallax Mouse Effect
