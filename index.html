@@ -726,6 +726,21 @@
             align-items: center;
         }
 
+        /* Collapsible stats */
+        .pet-panel.collapsed .pet-panel__stats { max-height: 0; overflow: hidden; opacity: 0; transform: scaleY(0.98); transition: max-height 0.35s ease, opacity 0.25s ease, transform 0.25s ease; }
+        .pet-panel .pet-panel__stats { max-height: 400px; transition: max-height 0.45s ease; }
+
+        .pet-toggle-btn {
+            background: transparent;
+            border: 2px solid rgba(0,0,0,0.06);
+            padding: 6px 8px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 800;
+            color: var(--accent-blue);
+            box-shadow: none;
+        }
+
         .pet-btn {
             background: linear-gradient(180deg, #ff9ae8 0%, #ff6ad6 100%);
             border: none;
@@ -1023,9 +1038,12 @@
         </svg>
     </div>
 
-    <div class="pet-panel" id="petPanel">
-        <div class="pet-panel__stats">
-            <div class="pet-panel__name">Pet Name: <span id="petName">Tama-bot</span></div>
+    <div class="pet-panel collapsed" id="petPanel">
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div class="pet-panel__name">Pet: <span id="petName">Tama-bot</span></div>
+            <button id="petToggle" class="pet-toggle-btn" aria-expanded="false">Show Stats ▾</button>
+        </div>
+        <div class="pet-panel__stats" id="petStats">
             <div class="stat">
                 <span>Happiness</span>
                 <div class="meter"><div id="happinessMeter"></div></div>
@@ -1081,6 +1099,8 @@
         const feedButton = document.getElementById('feedButton');
         const playButton = document.getElementById('playButton');
         const crawler = document.getElementById('crawler');
+        const petToggle = document.getElementById('petToggle');
+        const petStats = document.getElementById('petStats');
 
         let currentZoomCardData = null;
         let showingBackFace = false;
@@ -1389,6 +1409,25 @@
 
         updatePetMood();
         startPetSimulation();
+
+        // Pet stats submenu toggle with persistence
+        function setPetPanelOpen(open) {
+            petPanel.classList.toggle('collapsed', !open);
+            petToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            petToggle.textContent = open ? 'Hide Stats ▴' : 'Show Stats ▾';
+            try { localStorage.setItem('pet_panel_open', open ? '1' : '0'); } catch(e){}
+        }
+
+        petToggle.addEventListener('click', (e) => {
+            const isOpen = petPanel.classList.contains('collapsed') === false;
+            setPetPanelOpen(!isOpen);
+        });
+
+        // Initialize from storage
+        try {
+            const stored = localStorage.getItem('pet_panel_open');
+            setPetPanelOpen(stored === '1');
+        } catch (e) { setPetPanelOpen(false); }
         // ============= REACTIVE BACKGROUND LOGIC =============
         
         // 1. Parallax Mouse Effect
