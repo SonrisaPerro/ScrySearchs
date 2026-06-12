@@ -1187,7 +1187,7 @@
             if (this.files[0]) handleImageUpload(this.files[0]);
         });
 
-        // -- IMAGE SEARCH FUNCTION WITH FILTERS & MONETIZATION --
+       // -- IMAGE SEARCH FUNCTION WITH SCYFALL BULK API --
         async function handleImageUpload(file) {
             if (!file) return;
 
@@ -1248,18 +1248,14 @@
                     const scryfallData = scryfallDict[match.scryfall_id];
                     if (!scryfallData) continue; // Skip if Scryfall couldn't find the ID
 
-                    // Filtering Logic
                     if (shouldFilter) {
                         const layout = scryfallData.layout || '';
                         const commanderLegality = scryfallData.legalities ? scryfallData.legalities.commander : 'not_legal';
                         const isNonStandardLayout = ['token', 'double_faced_token', 'art_series', 'emblem', 'planar', 'vanguard', 'scheme'].includes(layout);
                         
-                        if (isNonStandardLayout || commanderLegality === 'not_legal') {
-                            continue; 
-                        }
+                        if (isNonStandardLayout || commanderLegality === 'not_legal') continue; 
                     }
 
-                    // Image Extraction Logic
                     let imageUrl = '';
                     if (scryfallData.image_uris && scryfallData.image_uris.normal) {
                         imageUrl = scryfallData.image_uris.normal;
@@ -1267,7 +1263,6 @@
                         imageUrl = scryfallData.card_faces[0].image_uris.normal;
                     }
 
-                    // Card DOM Construction
                     const cardDiv = document.createElement('div');
                     cardDiv.className = 'card';
                     
@@ -1277,6 +1272,7 @@
                     imgElement.scryfallData = scryfallData;
                     imgElement.matchName = match.name;
                     imgElement.matchScore = `Match Score: ${(match.similarity_score * 100).toFixed(1)}%`;
+                    
                     imgElement.addEventListener('click', activateZoomOverlay);
                     
                     const contentWrapper = document.createElement('div');
@@ -1311,7 +1307,9 @@
                         buyBtn.textContent = 'Buy on TCGplayer';
                         buyBtn.target = '_blank';
                         buyBtn.href = cleanAndWrapTcgUrl(rawTcgUrl);
+                        
                         buyBtn.addEventListener('click', e => e.stopPropagation());
+                        
                         contentWrapper.appendChild(buyBtn);
                     }
 
