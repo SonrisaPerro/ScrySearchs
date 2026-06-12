@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+python-multipart
 sentence-transformers
 faiss-cpu
 numpy
