@@ -1,5 +1,6 @@
 ﻿import asyncio
 import os
+import gdown
 import json
 from collections import defaultdict, deque
 from pathlib import Path
@@ -57,6 +58,14 @@ async def lifespan(app: FastAPI):
 
     with MAPPING_PATH.open("r", encoding="utf-8") as f:
         id_mapping = json.load(f)
+
+    # --- CLOUD DOWNLOAD WORKAROUND ---
+    DRIVE_FILE_ID = "1LCWxaFKxKPLx4ss2uDBSuHf0oQnVIe7d"
+    if not INDEX_PATH.exists():
+        print("Downloading FAISS index from Google Drive. Please wait...")
+        download_url = f"https://drive.google.com/uc?id={DRIVE_FILE_ID}"
+        gdown.download(download_url, str(INDEX_PATH), quiet=False)
+    # ---------------------------------
 
     index = load_index(INDEX_PATH)
     model = SentenceTransformer(str(MODEL_DIR))
