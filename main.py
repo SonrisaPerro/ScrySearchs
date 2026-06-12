@@ -171,7 +171,7 @@ def blend_images(
 
     embeddings = []
     
-    # Download and encode each card's art from Scryfall
+    # 1. Download and encode each card's art individually
     for url in url_list:
         try:
             res = requests.get(url, timeout=5)
@@ -181,8 +181,6 @@ def blend_images(
             if emb.ndim == 2:
                 emb = emb[0]
                 
-            # Normalize each vector BEFORE averaging
-            # This ensures no single image mathematically overpowers the blend
             faiss.normalize_L2(np.asarray([emb], dtype="float32"))
             embeddings.append(emb)
         except Exception as e:
@@ -191,35 +189,50 @@ def blend_images(
     if not embeddings:
         raise HTTPException(status_code=400, detail="Failed to process images")
 
-    # The Vibe Math: Average the normalized vectors together
-    avg_embedding = np.mean(embeddings, axis=0)
-    embedding_matrix = np.asarray([avg_embedding], dtype="float32")
-    
-    # Normalize the final averaged coordinate
-    faiss.normalize_L2(embedding_matrix)
+    # 2. THE PALETTE MATH: Multi-Query Pooling
+    candidate_pool = {}
+    k_per_query = 20  # Pull the top 20 closest matches for EVERY card in the palette
 
-    # Bump k to 50 so we have plenty of buffer when the frontend deletes the input cards
-    k = min(50, int(index.ntotal))
-    distances, indices = index.search(embedding_matrix, k)
+    for emb in embeddings:
+        query_matrix = np.asarray([emb], dtype="float32")
+        distances, indices = index.search(query_matrix, k_per_query)
+        
+        for score, idx in zip(distances[0], indices[0]):
+            if idx < 0 or idx >= len(id_mapping): 
+                continue
+                
+            # Filter out cards that exceed the user's leniency slider
+            if float(score) > leniency: 
+                continue
+                
+            scryfall_id = id_mapping[int(idx)]["scryfall_id"]
+            name = id_mapping[int(idx)]["name"]
+            
+            # 3. Deduplication & Scoring: 
+            # If a card is found multiple times, keep its strongest (lowest distance) score
+            if scryfall_id in candidate_pool:
+                candidate_pool[scryfall_id]["score"] = min(candidate_pool[scryfall_id]["score"], float(score))
+            else:
+                candidate_pool[scryfall_id] = {
+                    "scryfall_id": scryfall_id,
+                    "name": name,
+                    "score": float(score)
+                }
 
+    # 4. Sort the massive pool of candidates so the strongest overall matches rise to the top
+    sorted_candidates = sorted(candidate_pool.values(), key=lambda x: x["score"])
+
+    # 5. Format for the frontend
     results: List[Dict[str, Any]] = []
-    for score, idx in zip(distances[0], indices[0]):
-        if idx < 0 or idx >= len(id_mapping): 
-            continue
-            
-        if float(score) > leniency: 
-            continue
-            
-        card_meta = id_mapping[int(idx)]
+    for c in sorted_candidates:
         results.append({
-            "scryfall_id": card_meta["scryfall_id"],
-            "name": card_meta["name"],
-            "similarity_score": round(float(score), 4),
-            "api_link": f"https://api.scryfall.com/cards/{card_meta['scryfall_id']}"
+            "scryfall_id": c["scryfall_id"],
+            "name": c["name"],
+            "similarity_score": round(c["score"], 4),
+            "api_link": f"https://api.scryfall.com/cards/{c['scryfall_id']}"
         })
 
     return {"matches": results}
-
 
 @app.get("/health")
 async def health() -> Dict[str, str]:
