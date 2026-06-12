@@ -197,7 +197,7 @@ def blend_images(
 
     # 2. THE PALETTE MATH: Multi-Query Pooling
     candidate_pool = {}
-    k_per_query = 20  # Pull the top 20 closest matches for EVERY card in the palette
+    k_per_query = 150  # Pull the top 20 closest matches for EVERY card in the palette
 
     for emb in embeddings:
         # Search with our properly normalized vectors
