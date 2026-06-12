@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTG Reverse Image Search</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Comfortaa:wght@700&display=swap');
+
+        :root {
+            --bg-1: #87ceeb;
+            --bg-2: #e0f6ff;
+            --surface: #ffffff;
+            --surface-hover: #f0f8ff;
+            --text: #2c3e50;
+            --accent-blue: #0066ff;
+            --accent-green: #00cc00;
+            --accent-orange: #ff6600;
+            --accent-purple: #9933ff;
+            --accent-pink: #ff0099;
+            --shadow: rgba(0, 0, 0, 0.15);
+            --highlight: rgba(255, 255, 255, 0.6);
+            --border-hard: #0033cc;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            background: linear-gradient(180deg, #87ceeb 0%, #e0f6ff 50%, #b3e5fc 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        body {
+            font-family: 'Verdana', 'Fredoka', sans-serif;
+            background: transparent;
+            color: var(--text);
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 5rem 1.5rem;
+            text-align: center;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        h1 {
+            font-family: 'Arial Black', 'Comfortaa', cursive;
+            font-size: clamp(2rem, 8vw, 3.5rem);
+            margin: 0;
+            margin-bottom: 0.5rem;
+            position: relative;
+            z-index: 2;
+            color: var(--accent-blue);
+            text-shadow: 
+                2px 2px 0px #000,
+                -2px 0px 0px var(--accent-green),
+                2px -2px 0px var(--accent-orange);
+            letter-spacing: 0.02em;
+            font-weight: 900;
+        }
+
+        body > p {
+            color: var(--text);
+            position: relative;
+            z-index: 2;
+            font-size: clamp(0.95rem, 3vw, 1.1rem);
+            letter-spacing: 0.01em;
+            font-weight: 500;
+        }
+
+        body > p::before,
+        body > p::after {
+            content: '✩';
+            margin: 0 8px;
+            color: var(--accent-blue);
+            opacity: 0.6;
+        }
+        
+        /* Interactive Drag and Drop Zone */
+        .upload-container {
+            background: linear-gradient(135deg, #ffffff 0%, #e6f2ff 100%);
+            padding: clamp(1.5rem, 5vw, 2rem);
+            border: 4px solid var(--border-hard);
+            border-radius: 0px;
+            margin-bottom: 2rem;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+            box-shadow: 
+                4px 4px 0px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 var(--highlight);
+            overflow: hidden;
+        }
+
+        .upload-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: repeating-linear-gradient(90deg, var(--accent-blue), var(--accent-blue) 10px, transparent 10px, transparent 20px);
+            opacity: 0.4;
+        }
+
+        .upload-container:hover {
+            border-color: var(--accent-green);
+            box-shadow: 
+                6px 6px 0px rgba(0, 204, 0, 0.3),
+                inset 0 1px 0 var(--highlight);
+            background: #f9ffff;
+        }
+
+        .upload-container.drag-over {
+            border-color: var(--accent-orange);
+            background: #ffffcc;
+            box-shadow: 
+                6px 6px 0px rgba(255, 102, 0, 0.4),
+                inset 0 1px 0 var(--highlight);
+        }
+
+        .upload-container h3 { 
+            margin-top: 0;
+            color: var(--accent-blue);
+            position: relative;
+            z-index: 2;
+            font-weight: 700;
+            font-size: clamp(1.2rem, 4vw, 1.5rem);
+        }
+
+        .upload-container h3::before {
+            content: '▶';
+            margin-right: 8px;
+            color: var(--accent-green);
+            opacity: 0.7;
+        }
+
+        h3 {
+            font-family: 'Comfortaa', cursive;
+            color: var(--text);
+        }
+
+        h3::after {
+            content: '✦';
+            margin-left: 8px;
+            color: var(--accent-purple);
+            opacity: 0.6;
+        }
+
+        .upload-container p { 
+            color: var(--text); 
+            font-size: clamp(0.85rem, 2.5vw, 0.95rem); 
+            margin-bottom: 1.5rem;
+            position: relative;
+            z-index: 2;
+        }
+        
+        input[type="file"] { display: none; }
+
+        .upload-btn {
+            background: linear-gradient(180deg, #00cc33 0%, #00aa22 100%);
+            color: #fff;
+            padding: clamp(10px, 3vw, 12px) clamp(20px, 5vw, 28px);
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            display: inline-block;
+            transition: all 0.3s;
+            border: none;
+            position: relative;
+            z-index: 2;
+            box-shadow: 
+                0 6px 15px rgba(0, 170, 34, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5);
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+            font-family: 'Fredoka', sans-serif;
+            touch-action: manipulation;
+        }
+
+        .upload-btn:hover { 
+            box-shadow: 
+                0 10px 25px rgba(0, 170, 34, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.6);
+            transform: translateY(-2px);
+        }
+
+        .upload-btn:active {
+            transform: translateY(0) rotate(0deg);
+        }
+        
+        /* Filtering Controls Styling */
+        .controls {
+            margin-top: 15px;
+            background: #ffffff;
+            padding: clamp(8px, 2vw, 12px);
+            border: 3px dashed var(--accent-blue);
+            border-radius: 0px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: clamp(10px, 3vw, 20px);
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(0.75rem, 2vw, 0.85rem);
+            position: relative;
+            z-index: 2;
+            transition: all 0.2s ease;
+        }
+
+        .controls:hover {
+            border-color: var(--accent-green);
+            background: #f9ffff;
+        }
+
+        .controls input[type="number"] {
+            width: 50px;
+            background: linear-gradient(180deg, #ffffff 0%, #f0f8ff 100%);
+            color: var(--accent-blue);
+            border: 2px solid var(--accent-blue);
+            border-radius: 12px;
+            padding: 6px;
+            text-align: center;
+            font-family: 'Fredoka', sans-serif;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .controls input[type="checkbox"] {
+            accent-color: var(--accent-green);
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .controls label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        #preview {
+            max-width: 200px;
+            max-height: 200px;
+            margin-top: 15px;
+            border-radius: 15px;
+            display: none;
+            border: 3px solid var(--accent-blue);
+            position: relative;
+            z-index: 2;
+            box-shadow: 0 8px 20px var(--shadow);
+        }
+
+        .loader {
+            display: none;
+            margin: 20px auto;
+            border: 4px solid rgba(0, 153, 255, 0.2);
+            border-top: 4px solid var(--accent-blue);
+            border-right: 4px solid var(--accent-green);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin-smooth 1s linear infinite;
+            position: absolute;
+            top: calc(50% - 20px);
+            left: calc(50% - 20px);
+            z-index: 2;
+            box-shadow: 0 0 10px rgba(0, 153, 255, 0.3);
+        }
+
+        @keyframes spin-smooth { 
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .card {
+            background: #ffffff;
+            padding: 0;
+            border: 3px solid var(--border-hard);
+            border-radius: 0px;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            position: relative;
+            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.25);
+            transition: all 0.2s ease;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: repeating-linear-gradient(90deg, var(--accent-blue), var(--accent-blue) 6px, var(--accent-green) 6px, var(--accent-green) 12px);
+            z-index: 10;
+        }
+
+        .card:hover {
+            border-color: var(--accent-green);
+            box-shadow: 6px 6px 0px rgba(0, 204, 0, 0.4);
+            transform: translateY(-4px);
+            background: #f9ffff;
+        }
+
+        .card:hover img {
+            border-bottom-color: var(--accent-orange);
+        }
+
+        .card img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-bottom: 3px solid var(--accent-blue);
+            cursor: zoom-in;
+            transition: all 0.2s ease;
+            background: #f0f0f0;
+        }
+
+        .card img:hover {
+            filter: brightness(1.1);
+            border-bottom-color: var(--accent-green);
+        }
+
+        .card > div:not([class]) {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .card strong {
+            font-size: clamp(0.8rem, 2.5vw, 0.95rem);
+            color: var(--text);
+            margin-bottom: 6px;
+            text-align: center;
+            font-family: 'Verdana', sans-serif;
+            font-weight: bold;
+        }
+
+        .score {
+            font-size: clamp(0.65rem, 2vw, 0.75rem);
+            color: var(--accent-green);
+            margin-bottom: 8px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            background: #f0f0f0;
+            padding: 4px 6px;
+            border: 1px solid var(--accent-green);
+            border-radius: 0px;
+        }
+
+        .badge {
+            background: var(--accent-orange);
+            color: #fff;
+            font-size: 0.65rem;
+            padding: 4px 8px;
+            border: none;
+            margin-bottom: 6px;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border-radius: 0px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            align-self: center;
+        }
+
+        .badge::before {
+            content: '⚔';
+            font-size: 0.6rem;
+        }
+
+        /* TCGplayer Button Styles */
+        .buy-btn {
+            background: var(--accent-green);
+            color: #fff;
+            text-decoration: none;
+            padding: 8px 12px;
+            border: 2px solid #003300;
+            font-size: clamp(0.65rem, 2.5vw, 0.8rem);
+            font-weight: bold;
+            margin-top: auto;
+            transition: all 0.15s ease;
+            display: block;
+            border-radius: 0px;
+            font-family: 'Verdana', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+        }
+
+        .buy-btn:hover {
+            background: #00ff00;
+            color: #000;
+            border-color: #000;
+            transform: translateY(-1px);
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Card Overlay Styles */
+        .zoom-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, rgba(135, 206, 235, 0.9), rgba(224, 246, 255, 0.9));
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            cursor: zoom-out;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        .zoom-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .zoom-card-container {
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+            animation: zoom-in-bounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes zoom-in-bounce {
+            from { transform: scale(0.7) rotate(-5deg); opacity: 0; }
+            to { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        .zoom-overlay img {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 15px;
+            box-shadow: 
+                0 15px 50px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5);
+            display: block;
+            border: 4px solid #ffffff;
+        }
+
+        .flip-btn {
+            display: none;
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: linear-gradient(180deg, var(--accent-blue), #0066ff);
+            color: #fff;
+            border: none;
+            border-radius: 15px;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-size: clamp(0.7rem, 2vw, 0.8rem);
+            z-index: 1001;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0, 102, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            transition: all 0.2s;
+            font-family: 'Fredoka', sans-serif;
+            touch-action: manipulation;
+        }
+
+        .flip-btn:hover { 
+            box-shadow: 0 6px 18px rgba(0, 102, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        }
+
+        .is-double-faced .flip-btn { display: block; }
+
+        /* Donation Footer Styles */
+        .app-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: #ffffff;
+            border-top: 4px solid var(--border-hard);
+            padding: clamp(8px, 2vw, 12px) 1rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: clamp(10px, 2vw, 15px);
+            font-size: clamp(0.7rem, 2.5vw, 0.85rem);
+            z-index: 999;
+            box-shadow: 0 -4px 0px rgba(0, 0, 0, 0.2);
+            flex-wrap: wrap;
+            transition: all 0.2s ease;
+            font-family: 'Verdana', sans-serif;
+        }
+
+        .app-footer::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: repeating-linear-gradient(90deg, var(--accent-blue), var(--accent-blue) 10px, transparent 10px, transparent 20px);
+            opacity: 0.6;
+        }
+
+        .app-footer p { 
+            margin: 0; 
+            color: var(--text);
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        .donate-link {
+            background: var(--accent-orange);
+            color: #fff;
+            text-decoration: none;
+            padding: clamp(6px, 2vw, 8px) clamp(12px, 3vw, 16px);
+            border: 2px solid #663300;
+            font-weight: bold;
+            transition: all 0.15s ease;
+            border-radius: 0px;
+            font-family: 'Verdana', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: clamp(0.65rem, 2.5vw, 0.8rem);
+            touch-action: manipulation;
+        }
+
+        .donate-link:hover { 
+            background: #ff9900;
+            color: #000;
+            border-color: #000;
+            transform: translateY(-1px);
+            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
+        }
+
+        /* ============= REACTIVE BACKGROUND WINDOWS ============= */
+        .bg-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none; /* Lets clicks pass through to the main app */
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .bg-window {
+            position: absolute;
+            background: #c0c0c0;
+            border: 2px solid;
+            border-color: #ffffff #808080 #808080 #ffffff;
+            pointer-events: auto; /* Allows clicking the window itself */
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.1s ease-out;
+        }
+
+        .bg-window-header {
+            background: linear-gradient(90deg, darkblue, #1084d0);
+            color: white;
+            padding: 3px 6px;
+            font-family: 'Tahoma', sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: default;
+        }
+
+        .bg-window-close {
+            background: #c0c0c0;
+            color: black;
+            border: 2px solid;
+            border-color: #ffffff #808080 #808080 #ffffff;
+            font-size: 10px;
+            padding: 0 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .bg-window-close:active {
+            border-color: #808080 #ffffff #ffffff #808080;
+        }
+
+        .bg-window-content {
+            padding: 5px;
+            background: #fff;
+            border: 2px solid;
+            border-color: #808080 #ffffff #ffffff #808080;
+            margin: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Contact Tab Styles */
+        .contact-tab .contact-card {
+            width: 100%;
+            color: #08233a;
+            font-family: 'Verdana', sans-serif;
+            text-align: left;
+        }
+
+        .contact-tab .contact-card h4 {
+            margin: 0 0 6px 0;
+            font-size: 1rem;
+            color: var(--accent-blue);
+            font-weight: 800;
+        }
+
+        .contact-tab .contact-card .contact-body {
+            font-size: 0.85rem;
+            line-height: 1.25;
+            padding: 6px 0;
+        }
+
+        .contact-tab .contact-card .contact-body [contenteditable] {
+            min-width: 180px;
+            display: block;
+            padding: 6px;
+            border: 1px dashed #d0d8e0;
+            border-radius: 4px;
+            background: #fbfdff;
+        }
+
+        .contact-tab .contact-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .contact-tab .btn {
+            background: var(--accent-orange);
+            color: #000;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 2px solid rgba(0,0,0,0.08);
+        }
+
+        /* Cute crawler */
+        .crawler {
+            position: fixed;
+            bottom: 56px; /* sits above the footer */
+            left: -12%;
+            width: 120px;
+            height: 56px;
+            z-index: 1002;
+            pointer-events: auto;
+            will-change: transform;
+            animation: crawl 10s linear infinite;
+            display: flex;
+            align-items: center;
+        }
+
+        .crawler svg { display: block; width: 100%; height: auto; }
+
+        .crawler:hover { animation-play-state: paused; transform: translateY(-4px); }
+
+        @keyframes crawl {
+            0% { transform: translateX(-18vw) translateY(0); }
+            50% { transform: translateX(60vw) translateY(0); }
+            100% { transform: translateX(120vw) translateY(0); }
+        }
+
+        /* Floating Animations */
+        @keyframes float1 { 0% { top: 5%; left: 5%; } 100% { top: 15%; left: 10%; } }
+        @keyframes float2 { 0% { bottom: 15%; right: 5%; } 100% { bottom: 25%; right: 15%; } }
+        @keyframes float3 { 0% { top: 40%; right: 8%; } 100% { top: 30%; right: 12%; } }
+
+        .win-1 { animation: float1 20s infinite alternate ease-in-out; }
+        .win-2 { animation: float2 25s infinite alternate ease-in-out; }
+        .win-3 { animation: float3 18s infinite alternate ease-in-out; }
+
+        /* ============= MOBILE RESPONSIVENESS ============= */
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1.5rem 0.75rem 5.5rem 0.75rem;
+            }
+
+            h1 {
+                font-size: clamp(1.5rem, 6vw, 2.2rem);
+            }
+
+            #results {
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                gap: 12px;
+                margin-top: 15px;
+            }
+
+            .card {
+                border-width: 2px;
+            }
+
+            .card::before {
+                height: 2px;
+            }
+
+            .card:hover {
+                transform: translateY(-2px);
+                box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.25);
+            }
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 1rem 0.5rem 5.5rem 0.5rem;
+            }
+
+            h1 {
+                font-size: clamp(1.3rem, 5vw, 1.8rem);
+                margin-bottom: 0.3rem;
+            }
+
+            .upload-container {
+                border-width: 3px;
+                padding: 1rem;
+                margin-bottom: 1rem;
+            }
+
+            .controls {
+                flex-direction: column;
+                gap: 8px;
+                padding: 8px;
+            }
+
+            .controls label {
+                width: 100%;
+                justify-content: center;
+            }
+
+            #results {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gap: 10px;
+                margin-top: 10px;
+            }
+
+            .card {
+                border-width: 2px;
+                padding: 0;
+            }
+
+            .card strong {
+                font-size: 0.7rem;
+            }
+
+            .score {
+                font-size: 0.6rem;
+            }
+
+            .upload-btn {
+                width: 100%;
+                padding: 10px 14px;
+                font-size: 0.8rem;
+            }
+        }
+
+        @media (max-width: 400px) {
+            body {
+                padding: 0.75rem 0.5rem 5.5rem 0.5rem;
+            }
+
+            h1 {
+                font-size: clamp(1.1rem, 4vw, 1.5rem);
+                margin-bottom: 0.2rem;
+            }
+
+            .upload-container {
+                border: 3px solid var(--border-hard);
+                padding: 0.75rem;
+            }
+
+            #results {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .app-footer {
+                padding: 8px 0.5rem;
+                gap: 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="bg-layer" id="bgLayer">
+        <div class="bg-window win-1 contact-tab" style="top: 8%; left: 6%; width: 320px; height: auto;">
+            <div class="bg-window-header">
+                <span>✉ CONTACT</span>
+                <button class="bg-window-close" onclick="this.closest('.bg-window').style.display='none'">X</button>
+            </div>
+            <div class="bg-window-content">
+                <div class="contact-card">
+                    <h4>Contact Me</h4>
+                    <div class="contact-body">
+                        <div contenteditable="true" id="contactText">Hi — replace this text with your contact blurb. Add an email or short instructions.</div>
+                        <div class="contact-actions">
+                            <a id="emailLink" class="btn" href="mailto:you@example.com" target="_blank">Email Me</a>
+                            <button id="editContact" class="btn">Save</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-window win-2" style="bottom: 16%; right: 8%; width: 260px; height: 140px;">
+            <div class="bg-window-header">
+                <span>🔮 mana_generator.bat</span>
+                <button class="bg-window-close" onclick="this.closest('.bg-window').style.display='none'">X</button>
+            </div>
+            <div class="bg-window-content" style="background: #000; color: #fff; font-family: 'Courier New', monospace; font-size: 18px; padding: 12px; letter-spacing: 2px;">
+                <span id="manaScrambler">{W} {U} {B} {R} {G}</span>
+            </div>
+        </div>
+
+        <div class="bg-window win-3" style="top: 40%; right: 10%; width: 200px; height: 200px;">
+            <div class="bg-window-header">
+                <span>⚠️ SPONSOR</span>
+                <button class="bg-window-close" onclick="this.closest('.bg-window').style.display='none'">X</button>
+            </div>
+            <div class="bg-window-content" style="padding: 0; margin: 4px;">
+                <img id="retroAd" src="https://media.giphy.com/media/13HgwGsXF0aiGY/giphy.gif" width="180" height="180" style="object-fit: cover;">
+            </div>
+        </div>
+    </div>
+
+    <h1>MTG Reverse Image Search</h1>
+    <p>Upload artwork, a photo, or even a sketch to find the closest matching Magic cards.</p>
+
+    <div class="upload-container" id="dropZone">
+        <h3>1. Search with an Image</h3>
+        <p>Drag an image here OR paste from clipboard OR use the button.</p>
+        <label for="imageUpload" class="upload-btn">Choose an Image File...</label>
+        <input type="file" id="imageUpload" accept="image/*">
+        <br>
+        
+        <div class="controls" id="controlsContainer">
+            <label>
+                <input type="checkbox" id="filterCommander" checked>
+                Exclude Tokens, Art Cards, & Commander Illegal
+            </label>
+            <label>
+                Results to show: 
+                <input type="number" id="maxResults" value="10" min="1" max="30">
+            </label>
+        </div>
+
+        <br>
+        <img id="preview" alt="Image preview">
+        <div id="loading" class="loader"></div>
+    </div>
+
+    <h3>2. Match Results</h3>
+    <div id="results"></div>
+
+    <!-- Cute crawler: walks across above the footer -->
+    <div id="crawler" class="crawler" title="Friendly crawler">
+        <svg viewBox="0 0 120 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <g>
+                <ellipse cx="28" cy="44" rx="14" ry="6" fill="#2b2b2b" opacity="0.15" />
+                <rect x="10" y="14" width="70" height="36" rx="12" fill="#ffcc99" stroke="#b36b00" stroke-width="2" />
+                <circle cx="36" cy="32" r="8" fill="#ffffff" />
+                <circle cx="36" cy="32" r="4" fill="#000" />
+                <path d="M66 38 q6 -6 10 0" stroke="#b36b00" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <g transform="translate(82,36)">
+                    <rect x="0" y="-8" width="20" height="6" rx="2" fill="#ffcc99" stroke="#b36b00" stroke-width="2"/>
+                </g>
+            </g>
+        </svg>
+    </div>
+
+    <div class="zoom-overlay" id="zoomOverlay">
+        <div class="zoom-card-container">
+            <img id="zoomImage" src="" alt="Zoomed card">
+            <button class="flip-btn" id="flipBtn">Flip Back Face</button>
+        </div>
+    </div>
+
+    <footer class="app-footer">
+        <p>Keeping this awake costs money.</p>
+        <a href="https://ko-fi.com/sonriso" target="_blank" class="donate-link">☕ Support the Server</a>
+    </footer>
+
+    <script>
+        // 🚨 CONFIGURATION FOR AFFILIATE LINKING
+        // Once approved for an affiliate platform like Impact.com, you will receive an tracking redirect template.
+        // Leave this empty to use standard direct TCGplayer web links for now.
+        const IMPACT_AFFILIATE_REDIRECT = ""; // Example: "https://tcgplayer.pxf.io/c/YOUR_ID/subID/https://www.tcgplayer.com/product/"
+
+        const imageUpload = document.getElementById('imageUpload');
+        const preview = document.getElementById('preview');
+        const resultsContainer = document.getElementById('results');
+        const loading = document.getElementById('loading');
+        const dropZone = document.getElementById('dropZone');
+        const zoomOverlay = document.getElementById('zoomOverlay');
+        const zoomImage = document.getElementById('zoomImage');
+        const flipBtn = document.getElementById('flipBtn');
+        const controlsContainer = document.getElementById('controlsContainer');
+
+        let currentZoomCardData = null;
+        let showingBackFace = false;
+
+        // Prevent controls clicks from triggering file selector window
+        controlsContainer.addEventListener('click', e => e.stopPropagation());
+
+        // Helper function to build affiliate URLs dynamically
+        function cleanAndWrapTcgUrl(rawScryfallTcgUrl) {
+            if (!rawScryfallTcgUrl) return "#";
+            
+            // Strip out Scryfall's built-in affiliate codes to prevent tag conflicts
+            let cleanUrl = rawScryfallTcgUrl.split('?')[0];
+
+            if (IMPACT_AFFILIATE_REDIRECT) {
+                // If you have an affiliate redirect wrapper, encode the clean target link and append it
+                return `${IMPACT_AFFILIATE_REDIRECT}${encodeURIComponent(cleanUrl)}`;
+            }
+            return cleanUrl;
+        }
+
+        // -- DRAG & DROP LOGIC --
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, e => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.add('drag-over');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('drag-over');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', e => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files && files.length > 0) {
+                handleImageUpload(files[0]);
+            }
+        }, false);
+
+        // -- PASTE FROM CLIPBOARD LOGIC --
+        document.body.addEventListener('paste', e => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (const item of items) {
+                if (item.kind === 'file' && item.type.indexOf("image") === 0) {
+                    handleImageUpload(item.getAsFile());
+                    return;
+                }
+            }
+        });
+
+        imageUpload.addEventListener('change', function() {
+            if (this.files[0]) handleImageUpload(this.files[0]);
+        });
+
+        // -- IMAGE SEARCH FUNCTION WITH FILTERS & MONETIZATION --
+        async function handleImageUpload(file) {
+            if (!file) return;
+
+            const shouldFilter = document.getElementById('filterCommander').checked;
+            const maxResults = parseInt(document.getElementById('maxResults').value, 10);
+
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'inline-block';
+            resultsContainer.innerHTML = ''; 
+            loading.style.display = 'block'; 
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error("Backend error.");
+                const data = await response.json();
+
+                let displayedCount = 0;
+
+                for (const match of data.matches) {
+                    if (displayedCount >= maxResults) break;
+
+                    await new Promise(r => setTimeout(r, 50)); 
+                    
+                    const scryfallRes = await fetch(match.api_link);
+                    const scryfallData = await scryfallRes.json();
+
+                    // Legality & Layout Filters
+                    if (shouldFilter) {
+                        const layout = scryfallData.layout || '';
+                        const commanderLegality = scryfallData.legalities ? scryfallData.legalities.commander : 'not_legal';
+                        const isNonStandardLayout = ['token', 'double_faced_token', 'art_series', 'emblem', 'planar', 'vanguard', 'scheme'].includes(layout);
+                        
+                        if (isNonStandardLayout || commanderLegality === 'not_legal') {
+                            continue; 
+                        }
+                    }
+
+                    // Handle Images
+                    let imageUrl = '';
+                    if (scryfallData.image_uris && scryfallData.image_uris.normal) {
+                        imageUrl = scryfallData.image_uris.normal;
+                    } else if (scryfallData.card_faces && scryfallData.card_faces[0].image_uris) {
+                        imageUrl = scryfallData.card_faces[0].image_uris.normal;
+                    }
+
+                    // Render Card
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = 'card';
+                    
+                    const imgElement = document.createElement('img');
+                    imgElement.src = imageUrl;
+                    imgElement.alt = match.name;
+                    imgElement.scryfallData = scryfallData;
+                    imgElement.addEventListener('click', activateZoomOverlay);
+                    
+                    const contentWrapper = document.createElement('div');
+                    contentWrapper.style.padding = '12px';
+                    contentWrapper.style.display = 'flex';
+                    contentWrapper.style.flexDirection = 'column';
+                    contentWrapper.style.flexGrow = '1';
+                    
+                    const nameElement = document.createElement('strong');
+                    nameElement.textContent = match.name;
+                    
+                    const scoreElement = document.createElement('div');
+                    scoreElement.className = 'score';
+                    scoreElement.textContent = `Match Score: ${(match.similarity_score * 100).toFixed(1)}%`;
+
+                    cardDiv.appendChild(imgElement);
+                    contentWrapper.appendChild(nameElement);
+
+                    // Add a BANNED badge if a standard card is banned in Commander
+                    if (scryfallData.legalities && scryfallData.legalities.commander === 'banned') {
+                        const bannedBadge = document.createElement('div');
+                        bannedBadge.className = 'badge';
+                        bannedBadge.textContent = 'BANNED IN EDH';
+                        contentWrapper.appendChild(bannedBadge);
+                    }
+
+                    contentWrapper.appendChild(scoreElement);
+
+                    //  Add TCGplayer Affiliate Link Button
+                    // Scryfall houses the direct purchase link nested inside purchase_uris.tcgplayer
+                    const rawTcgUrl = scryfallData.purchase_uris ? scryfallData.purchase_uris.tcgplayer : null;
+                    if (rawTcgUrl) {
+                        const buyBtn = document.createElement('a');
+                        buyBtn.className = 'buy-btn';
+                        buyBtn.textContent = 'Buy on TCGplayer';
+                        buyBtn.target = '_blank';
+                        buyBtn.href = cleanAndWrapTcgUrl(rawTcgUrl);
+                        
+                        // Prevent clicking the button from triggering the card zoom interaction
+                        buyBtn.addEventListener('click', e => e.stopPropagation());
+                        
+                        contentWrapper.appendChild(buyBtn);
+                    }
+
+                    cardDiv.appendChild(contentWrapper);
+                    resultsContainer.appendChild(cardDiv);
+                    displayedCount++;
+                }
+            } catch (error) {
+                alert("Error connecting to backend or Scryfall API.");
+                console.error(error);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // -- ZOOM OVERLAY LOGIC --
+        function activateZoomOverlay(e) {
+            currentZoomCardData = e.target.scryfallData;
+            showingBackFace = false;
+            
+            zoomImage.src = e.target.src; 
+            zoomOverlay.classList.add('active');
+            
+            if (currentZoomCardData.card_faces && currentZoomCardData.card_faces[1] && currentZoomCardData.card_faces[1].image_uris) {
+                zoomOverlay.classList.add('is-double-faced');
+                flipBtn.textContent = "Flip (Back Face)";
+            } else {
+                zoomOverlay.classList.remove('is-double-faced');
+            }
+        }
+
+        function closeZoomOverlay() {
+            zoomOverlay.classList.remove('active');
+            zoomImage.src = "";
+        }
+
+        zoomOverlay.addEventListener('click', (e) => {
+            if (e.target === zoomOverlay || e.target === zoomImage) {
+                closeZoomOverlay();
+            }
+        });
+        
+        flipBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); 
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === "Escape" && zoomOverlay.classList.contains('active')) {
+                closeZoomOverlay();
+            }
+        });
+
+        // -- FLIP BACK FACE LOGIC --
+        flipBtn.addEventListener('click', () => {
+            if (!currentZoomCardData || !currentZoomCardData.card_faces) return;
+            
+            const frontFace = currentZoomCardData.card_faces[0];
+            const backFace = currentZoomCardData.card_faces[1];
+            
+            if (showingBackFace) {
+                zoomImage.src = frontFace.image_uris.normal;
+                flipBtn.textContent = "Flip (Back Face)";
+            } else {
+                zoomImage.src = backFace.image_uris.normal;
+                flipBtn.textContent = "Flip (Front Face)";
+            }
+            
+            showingBackFace = !showingBackFace;
+        });
+        // ============= REACTIVE BACKGROUND LOGIC =============
+        
+        // 1. Parallax Mouse Effect
+        document.addEventListener('mousemove', (e) => {
+            const x = (e.clientX / window.innerWidth - 0.5) * 40; // Max 20px shift
+            const y = (e.clientY / window.innerHeight - 0.5) * 40;
+            
+            const windows = document.querySelectorAll('.bg-window');
+            windows.forEach((win, index) => {
+                // Different depths for different windows
+                const depth = (index + 1) * 0.8; 
+                win.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
+            });
+        });
+
+        // 2. MTG Mana Slot Machine logic
+        const manaContainer = document.getElementById('manaScrambler');
+        const manaSymbols = ['W', 'U', 'B', 'R', 'G', 'C', '1', '2', 'X'];
+        
+        setInterval(() => {
+            let combo = '';
+            // Generate 5 random symbols
+            for(let i = 0; i < 5; i++) {
+                const randomSym = manaSymbols[Math.floor(Math.random() * manaSymbols.length)];
+                combo += `{${randomSym}} `;
+            }
+            manaContainer.textContent = combo;
+        }, 800); // Changes every 0.8 seconds
+
+        // 3. Rotating Retro Ads
+        const adElement = document.getElementById('retroAd');
+        const adImages = [
+            "https://media.giphy.com/media/13HgwGsXF0aiGY/giphy.gif", // Windows maze
+            "https://media.giphy.com/media/26AHG5KGFxSkUWw1i/giphy.gif", // Glitch text
+            "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3RnZTl2aW9oM3VveXNldXV5NzE0ZWc4NnQ4ZHQwaHUxcW1zajlzNSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/L1R1tvI9svkIWwpVYr/giphy.gif" // Dial up
+        ];
+        let currentAd = 0;
+        
+        setInterval(() => {
+            currentAd = (currentAd + 1) % adImages.length;
+            adElement.src = adImages[currentAd];
+        }, 4500); // Cycles every 4.5 seconds
+
+        // Load/save the contact blurb so you can customize it
+        (function setupContactPersistence(){
+            const contactTextEl = document.getElementById('contactText');
+            const editBtn = document.getElementById('editContact');
+            const emailLink = document.getElementById('emailLink');
+            if (!contactTextEl || !editBtn || !emailLink) return;
+
+            const saved = localStorage.getItem('contact_blurb');
+            if (saved) contactTextEl.textContent = saved;
+
+            // update mailto body with current blurb
+            function refreshMailto(){
+                const body = encodeURIComponent(contactTextEl.textContent || '');
+                emailLink.href = `mailto:you@example.com?body=${body}`;
+            }
+
+            refreshMailto();
+
+            editBtn.addEventListener('click', () => {
+                localStorage.setItem('contact_blurb', contactTextEl.textContent || '');
+                editBtn.textContent = 'Saved';
+                refreshMailto();
+                setTimeout(() => editBtn.textContent = 'Save', 1200);
+            });
+        })();
+    </script>
+</body>
+</html>

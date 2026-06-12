@@ -1,0 +1,31 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+.env/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Deployment and build
+dist/
+build/
+*.egg-info/
+
+# Local data and model artifacts
+images/
+clip-model/
+*.faiss
+id_mapping.json
+
+# IDE metadata
+.vscode/
+.idea/
