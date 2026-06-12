@@ -2,13 +2,14 @@
 import os
 import gdown
 import json
+import requests
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Dict, Deque, List
 
 import faiss
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image
@@ -109,7 +110,11 @@ async def simple_rate_limiter(request: Request, call_next):
 
 
 @app.post("/search")
-async def search_image(file: UploadFile = File(...)) -> Dict[str, List[Dict[str, Any]]]:
+async def search_image(
+    file: UploadFile = File(...),
+    leniency: float = Form(1.0)
+) -> Dict[str, List[Dict[str, Any]]]:
+    
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image.")
 
@@ -136,6 +141,10 @@ async def search_image(file: UploadFile = File(...)) -> Dict[str, List[Dict[str,
     for score, idx in zip(distances[0], indices[0]):
         if idx < 0 or idx >= len(id_mapping):
             continue
+            
+        # The Leniency Filter
+        if float(score) > leniency:
+            continue
 
         card_meta = id_mapping[int(idx)]
         results.append(
@@ -146,6 +155,62 @@ async def search_image(file: UploadFile = File(...)) -> Dict[str, List[Dict[str,
                 "api_link": f"https://api.scryfall.com/cards/{card_meta['scryfall_id']}"
             }
         )
+
+    return {"matches": results}
+
+
+@app.post("/blend")
+def blend_images(
+    urls: str = Form(...),
+    leniency: float = Form(1.0)
+) -> Dict[str, List[Dict[str, Any]]]:
+    
+    url_list = [u.strip() for u in urls.split(",") if u.strip()]
+    if not url_list:
+        raise HTTPException(status_code=400, detail="No URLs provided")
+
+    embeddings = []
+    
+    # Download and encode each card's art from Scryfall
+    for url in url_list:
+        try:
+            res = requests.get(url, timeout=5)
+            res.raise_for_status()
+            img = Image.open(BytesIO(res.content)).convert("RGB")
+            emb = model.encode([img], convert_to_numpy=True)
+            if emb.ndim == 2:
+                emb = emb[0]
+            embeddings.append(emb)
+        except Exception as e:
+            print(f"Skipping {url}: {e}")
+
+    if not embeddings:
+        raise HTTPException(status_code=400, detail="Failed to process images")
+
+    # The Vibe Math: Average the vectors together
+    avg_embedding = np.mean(embeddings, axis=0)
+    embedding_matrix = np.asarray([avg_embedding], dtype="float32")
+    faiss.normalize_L2(embedding_matrix)
+
+    # Search FAISS with the new averaged vector
+    k = min(30, int(index.ntotal))
+    distances, indices = index.search(embedding_matrix, k)
+
+    results: List[Dict[str, Any]] = []
+    for score, idx in zip(distances[0], indices[0]):
+        if idx < 0 or idx >= len(id_mapping): 
+            continue
+            
+        if float(score) > leniency: 
+            continue
+            
+        card_meta = id_mapping[int(idx)]
+        results.append({
+            "scryfall_id": card_meta["scryfall_id"],
+            "name": card_meta["name"],
+            "similarity_score": round(float(score), 4),
+            "api_link": f"https://api.scryfall.com/cards/{card_meta['scryfall_id']}"
+        })
 
     return {"matches": results}
 
