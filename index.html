@@ -45,6 +45,12 @@
             overflow-x: hidden;
         }
 
+        /* Ironclad Z-Index Rule: Forces all main content above the background layer */
+        body > *:not(.bg-layer, .toast-container, .zoom-overlay, .achievements-modal, .app-footer) {
+            position: relative;
+            z-index: 10;
+        }
+
         h1 {
             font-family: 'Arial Black', 'Comfortaa', cursive;
             font-size: clamp(2rem, 8vw, 3.5rem);
@@ -890,7 +896,7 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <div class="bg-layer" id="bgLayer">
-        <div class="bg-window win-1 contact-tab" style="top: 8%; left: 6%; width: 320px; height: auto;">
+        <div class="bg-window win-1 contact-tab" style="top: 8%; left: 2%; width: 320px; height: auto;">
             <div class="bg-window-header">
                 <span>✉ CONTACT</span>
                 <button class="bg-window-close" onclick="this.closest('.bg-window').style.display='none'">X</button>
@@ -909,9 +915,8 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="bg-window win-2" style="bottom: 16%; right: 8%; width: 260px; height: 140px;">
+        <div class="bg-window win-2" style="bottom: 12%; right: 2%; width: 260px; height: 140px;">
             <div class="bg-window-header">
                 <span>🔮 mana_generator.bat</span>
                 <button class="bg-window-close" onclick="this.closest('.bg-window').style.display='none'">X</button>
@@ -921,7 +926,7 @@
             </div>
         </div>
 
-        <div class="bg-window win-3" style="top: 40%; right: 10%; width: 200px; height: 200px;">
+        <div class="bg-window win-3" style="top: 25%; right: 2%; width: 200px; height: 200px;">
             <div class="bg-window-header">
                 <span>⚠️ SPONSOR</span>
                 <button class="bg-window-close" onclick="this.closest('.bg-window').style.display='none'">X</button>
@@ -1598,7 +1603,7 @@
         setInterval(() => {
             currentAd = (currentAd + 1) % adImages.length;
             adElement.src = adImages[currentAd];
-        }, 4500); 
+        }, 4500);
     </script>
 </body>
 </html>
