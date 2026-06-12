@@ -24,7 +24,6 @@ build/
 images/
 clip-model/
 *.faiss
-id_mapping.json
 
 # IDE metadata
 .vscode/
