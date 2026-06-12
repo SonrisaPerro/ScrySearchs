@@ -1571,6 +1571,17 @@
                     }
                     cardDiv.appendChild(contentWrapper); resultsContainer.appendChild(cardDiv);
                 }
+
+                // UI Feedback if we ran out of results
+                if (displayedCount === 0) {
+                    resultsContainer.innerHTML = '<p style="grid-column: 1/-1; font-weight: bold; text-align: center; margin-top: 2rem;">No aesthetic matches passed your current filters. Try loosening the Leniency slider!</p>';
+                } else if (displayedCount < maxResults) {
+                    const endMsg = document.createElement('p');
+                    endMsg.style.cssText = "grid-column: 1/-1; text-align: center; font-weight: bold; margin-top: 2rem; opacity: 0.7;";
+                    endMsg.textContent = "End of high-confidence aesthetic matches. Loosen the Leniency slider to see more!";
+                    resultsContainer.appendChild(endMsg);
+                }
+                
             } catch (error) {
                 alert("Error running Vibe Math. Check backend logs."); console.error(error);
             } finally { loading.style.display = 'none'; }
