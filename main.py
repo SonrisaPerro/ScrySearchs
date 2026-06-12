@@ -177,12 +177,18 @@ def blend_images(
             res = requests.get(url, timeout=5)
             res.raise_for_status()
             img = Image.open(BytesIO(res.content)).convert("RGB")
+            
+            # Get the raw math vector
             emb = model.encode([img], convert_to_numpy=True)
             if emb.ndim == 2:
                 emb = emb[0]
                 
-            faiss.normalize_L2(np.asarray([emb], dtype="float32"))
-            embeddings.append(emb)
+            # THE FIX: Create the array, normalize it, and explicitly save it!
+            emb_matrix = np.asarray([emb], dtype="float32")
+            faiss.normalize_L2(emb_matrix)
+            
+            # Append the normalized version to our list
+            embeddings.append(emb_matrix[0])
         except Exception as e:
             print(f"Skipping {url}: {e}")
 
@@ -194,6 +200,7 @@ def blend_images(
     k_per_query = 20  # Pull the top 20 closest matches for EVERY card in the palette
 
     for emb in embeddings:
+        # Search with our properly normalized vectors
         query_matrix = np.asarray([emb], dtype="float32")
         distances, indices = index.search(query_matrix, k_per_query)
         
@@ -208,8 +215,7 @@ def blend_images(
             scryfall_id = id_mapping[int(idx)]["scryfall_id"]
             name = id_mapping[int(idx)]["name"]
             
-            # 3. Deduplication & Scoring: 
-            # If a card is found multiple times, keep its strongest (lowest distance) score
+            # 3. Deduplication & Scoring
             if scryfall_id in candidate_pool:
                 candidate_pool[scryfall_id]["score"] = min(candidate_pool[scryfall_id]["score"], float(score))
             else:
