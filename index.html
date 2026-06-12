@@ -932,9 +932,25 @@
 
     <h1>MTG Reverse Image Search</h1>
     <p>Upload artwork, a photo, or even a sketch to find the closest matching Magic cards.</p>
+    <div class="upload-container" style="margin-bottom: 20px;">
+        <h3>1. "Vibe Math" Multi-Card Blend</h3>
+        <p>Search for up to 5 cards to average their art together.</p>
+        
+        <div style="position:relative; width:90%; max-width:500px; margin:0 auto;">
+            <input type="text" id="cardSearchText" placeholder="Type a card name to add to blend..." style="width:100%; padding:10px; border:3px solid var(--accent-blue); font-family:inherit; font-weight:bold; font-size:1rem;">
+            
+            <div id="cardSearchDropdown" style="display:none; position:absolute; top:100%; left:0; width:100%; background:#fff; border:3px solid var(--accent-blue); border-top:none; z-index:1000; max-height:200px; overflow-y:auto; text-align:left; box-shadow: 4px 4px 0px rgba(0,0,0,0.2);">
+                </div>
+        </div>
+
+        <div id="blendRow" style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:15px; min-height:50px;">
+            </div>
+
+        <button class="upload-btn" id="blendBtn" style="margin-top:15px; display:none; background: linear-gradient(180deg, #9933ff 0%, #6600cc 100%);">🌀 Blend & Search</button>
+    </div>
 
     <div class="upload-container" id="dropZone">
-        <h3>1. Search with an Image</h3>
+        <h3>2. Search with an Image</h3>
         <p>Drag an image here OR paste from clipboard OR use the button.</p>
         <label for="imageUpload" class="upload-btn">Choose an Image File...</label>
         <input type="file" id="imageUpload" accept="image/*">
