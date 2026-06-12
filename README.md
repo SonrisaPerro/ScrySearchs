@@ -22,7 +22,6 @@ This project indexes Scryfall artwork and enables image-based card matching.
 - Browser frontend with drag-and-drop, clipboard paste, and file upload
 - Result filtering for nonstandard card layouts and Commander legality
 - Automatic card metadata lookup from Scryfall API
-- Optional affiliate redirect support for TCGplayer links
 
 ## Requirements
 
