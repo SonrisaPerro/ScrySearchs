@@ -1340,6 +1340,17 @@
                     resultsContainer.appendChild(cardDiv);
                     displayedCount++;
                 }
+
+                // UI Feedback if we ran out of results
+                if (displayedCount === 0) {
+                    resultsContainer.innerHTML = '<p style="grid-column: 1/-1; font-weight: bold; text-align: center; margin-top: 2rem;">No matches passed your current filters. Try loosening the Leniency slider!</p>';
+                } else if (displayedCount < maxResults) {
+                    const endMsg = document.createElement('p');
+                    endMsg.style.cssText = "grid-column: 1/-1; text-align: center; font-weight: bold; margin-top: 2rem; opacity: 0.7;";
+                    endMsg.textContent = "End of high-confidence matches. Loosen the Leniency slider to see more!";
+                    resultsContainer.appendChild(endMsg);
+                }
+
             } catch (error) {
                 alert("Error connecting to backend or Scryfall API.");
                 console.error(error);
@@ -1523,6 +1534,7 @@
                 if (scryfallBulkData.data) { scryfallBulkData.data.forEach(c => { scryfallDict[c.id] = c; }); }
 
                 const shouldFilter = document.getElementById('filterCommander').checked;
+                let displayedCount = 0;
 
                 for (const match of limitedMatches) {
                     const scryfallData = scryfallDict[match.scryfall_id];
