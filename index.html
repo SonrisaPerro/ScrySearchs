@@ -1599,31 +1599,6 @@
             currentAd = (currentAd + 1) % adImages.length;
             adElement.src = adImages[currentAd];
         }, 4500); 
-
-        // Load/save the contact blurb
-        (function setupContactPersistence(){
-            const contactTextEl = document.getElementById('contactText');
-            const editBtn = document.getElementById('editContact');
-            const emailLink = document.getElementById('emailLink');
-            if (!contactTextEl || !editBtn || !emailLink) return;
-
-            const saved = localStorage.getItem('contact_blurb');
-            if (saved) contactTextEl.textContent = saved;
-
-            function refreshMailto(){
-                const body = encodeURIComponent(contactTextEl.textContent || '');
-                emailLink.href = `mailto:you@example.com?body=${body}`;
-            }
-
-            refreshMailto();
-
-            editBtn.addEventListener('click', () => {
-                localStorage.setItem('contact_blurb', contactTextEl.textContent || '');
-                editBtn.textContent = 'Saved';
-                refreshMailto();
-                setTimeout(() => editBtn.textContent = 'Save', 1200);
-            });
-        })();
     </script>
 </body>
 </html>
