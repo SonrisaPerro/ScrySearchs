@@ -1400,6 +1400,159 @@
             
             showingBackFace = !showingBackFace;
         });
+        // ============= VIBE MATH BLENDER LOGIC =============
+        let blendQueueUrls = [];
+        const searchInput = document.getElementById('cardSearchText');
+        const searchDropdown = document.getElementById('cardSearchDropdown');
+        const blendRow = document.getElementById('blendRow');
+        const blendBtn = document.getElementById('blendBtn');
+
+        // Scryfall Autocomplete
+        searchInput.addEventListener('input', async (e) => {
+            const q = e.target.value;
+            if(q.length < 3) { searchDropdown.style.display = 'none'; return; }
+            
+            const res = await fetch(`https://api.scryfall.com/cards/autocomplete?q=${q}`);
+            const data = await res.json();
+            
+            searchDropdown.innerHTML = '';
+            data.data.forEach(name => {
+                const div = document.createElement('div');
+                div.textContent = name;
+                div.style.padding = "8px 12px";
+                div.style.cursor = "pointer";
+                div.style.borderBottom = "1px dashed #ccc";
+                div.onmouseover = () => div.style.background = "var(--surface-hover)";
+                div.onmouseout = () => div.style.background = "transparent";
+                div.onclick = () => addCardToBlend(name);
+                searchDropdown.appendChild(div);
+            });
+            searchDropdown.style.display = 'block';
+        });
+
+        // Add to the visual row
+        async function addCardToBlend(name) {
+            if(blendQueueUrls.length >= 5) { alert("Maximum 5 cards allowed for vibe math!"); return; }
+            
+            searchInput.value = '';
+            searchDropdown.style.display = 'none';
+            
+            const res = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`);
+            const card = await res.json();
+            
+            let imgUrl = '';
+            if (card.image_uris && card.image_uris.normal) { imgUrl = card.image_uris.normal; } 
+            else if (card.card_faces && card.card_faces[0].image_uris) { imgUrl = card.card_faces[0].image_uris.normal; }
+
+            if(imgUrl) {
+                blendQueueUrls.push(imgUrl);
+                
+                const imgThumb = document.createElement('img');
+                imgThumb.src = imgUrl;
+                imgThumb.style.width = "80px";
+                imgThumb.style.borderRadius = "5px";
+                imgThumb.style.border = "2px solid #000";
+                imgThumb.style.boxShadow = "2px 2px 0px rgba(0,0,0,0.5)";
+                imgThumb.title = "Click to remove";
+                imgThumb.style.cursor = "pointer";
+                
+                // Allow removing by clicking
+                imgThumb.onclick = () => {
+                    const index = blendQueueUrls.indexOf(imgUrl);
+                    if (index > -1) blendQueueUrls.splice(index, 1);
+                    blendRow.removeChild(imgThumb);
+                    if(blendQueueUrls.length === 0) blendBtn.style.display = 'none';
+                };
+                
+                blendRow.appendChild(imgThumb);
+                blendBtn.style.display = 'inline-block';
+            }
+        }
+
+        // Fire the Blend Search
+        blendBtn.addEventListener('click', async () => {
+            if(blendQueueUrls.length === 0) return;
+            
+            const maxResults = parseInt(document.getElementById('maxResults').value, 10);
+            const currentLeniency = document.getElementById('leniencySlider').value;
+
+            resultsContainer.innerHTML = ''; 
+            loading.style.display = 'block'; 
+
+            const formData = new FormData();
+            formData.append('urls', blendQueueUrls.join(','));
+            formData.append('leniency', currentLeniency);
+
+            try {
+                // Hit our new Python endpoint
+                const response = await fetch('https://scryfallsearch.up.railway.app/blend', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error("Backend error.");
+                const data = await response.json();
+                trackScan(); 
+
+                // We reuse the exact same Bulk Scryfall Logic from the standard upload
+                const limitedMatches = data.matches.slice(0, maxResults);
+                const identifiers = limitedMatches.map(match => ({ id: match.scryfall_id }));
+
+                if (identifiers.length === 0) {
+                    resultsContainer.innerHTML = '<p style="grid-column: 1/-1;">No matches found.</p>';
+                    return;
+                }
+
+                const scryfallRes = await fetch('https://api.scryfall.com/cards/collection', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ identifiers: identifiers })
+                });
+                const scryfallBulkData = await scryfallRes.json();
+                const scryfallDict = {};
+                if (scryfallBulkData.data) { scryfallBulkData.data.forEach(c => { scryfallDict[c.id] = c; }); }
+
+                const shouldFilter = document.getElementById('filterCommander').checked;
+
+                for (const match of limitedMatches) {
+                    const scryfallData = scryfallDict[match.scryfall_id];
+                    if (!scryfallData) continue; 
+
+                    if (shouldFilter) {
+                        const layout = scryfallData.layout || '';
+                        const commanderLegality = scryfallData.legalities ? scryfallData.legalities.commander : 'not_legal';
+                        const isNonStandardLayout = ['token', 'double_faced_token', 'art_series', 'emblem', 'planar', 'vanguard', 'scheme'].includes(layout);
+                        if (isNonStandardLayout || commanderLegality === 'not_legal') continue; 
+                    }
+
+                    let imageUrl = scryfallData.image_uris ? scryfallData.image_uris.normal : (scryfallData.card_faces ? scryfallData.card_faces[0].image_uris.normal : '');
+
+                    // Construct UI Card (identical to your image search code)
+                    const cardDiv = document.createElement('div'); cardDiv.className = 'card';
+                    const imgElement = document.createElement('img'); imgElement.src = imageUrl;
+                    imgElement.scryfallData = scryfallData; imgElement.matchName = match.name; imgElement.matchScore = `Blend Score: ${(match.similarity_score * 100).toFixed(1)}%`;
+                    imgElement.addEventListener('click', activateZoomOverlay);
+                    
+                    const contentWrapper = document.createElement('div'); contentWrapper.style = "padding:12px; display:flex; flex-direction:column; flex-grow:1;";
+                    const nameElement = document.createElement('strong'); nameElement.textContent = match.name;
+                    const scoreElement = document.createElement('div'); scoreElement.className = 'score'; scoreElement.textContent = imgElement.matchScore;
+
+                    cardDiv.appendChild(imgElement); contentWrapper.appendChild(nameElement);
+                    if (scryfallData.legalities && scryfallData.legalities.commander === 'banned') {
+                        const bannedBadge = document.createElement('div'); bannedBadge.className = 'badge'; bannedBadge.textContent = 'BANNED IN EDH'; contentWrapper.appendChild(bannedBadge);
+                    }
+                    contentWrapper.appendChild(scoreElement);
+
+                    const rawTcgUrl = scryfallData.purchase_uris ? scryfallData.purchase_uris.tcgplayer : null;
+                    if (rawTcgUrl) {
+                        const buyBtn = document.createElement('a'); buyBtn.className = 'buy-btn'; buyBtn.textContent = 'Buy on TCGplayer'; buyBtn.target = '_blank';
+                        buyBtn.href = cleanAndWrapTcgUrl(rawTcgUrl); buyBtn.addEventListener('click', e => e.stopPropagation()); contentWrapper.appendChild(buyBtn);
+                    }
+                    cardDiv.appendChild(contentWrapper); resultsContainer.appendChild(cardDiv);
+                }
+            } catch (error) {
+                alert("Error running Vibe Math. Check backend logs."); console.error(error);
+            } finally { loading.style.display = 'none'; }
+        });
 
         // ============= REACTIVE BACKGROUND LOGIC =============
         
