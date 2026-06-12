@@ -1,3 +1,6 @@
+Here is the complete, integrated code with the new achievement system, toast notifications, the viewer modal, and the hidden esoteric unlocks wired directly into your existing architecture.
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -550,6 +553,50 @@
 
         .is-double-faced .flip-btn { display: block; }
 
+        /* ============= ACHIEVEMENTS & TOAST UI ============= */
+        .stats-tracker {
+            position: absolute; top: 15px; right: 15px; background: #ffffff; 
+            padding: 8px 12px; border: 2px solid var(--border-hard); 
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.2); font-weight: bold; 
+            font-family: 'Courier New', monospace; z-index: 100;
+        }
+
+        .achievements-modal {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 400px; max-width: 90%; max-height: 80vh; overflow-y: auto;
+            background: #c0c0c0; border-top: 2px solid #fff; border-left: 2px solid #fff;
+            border-bottom: 2px solid #000; border-right: 2px solid #000;
+            z-index: 3000; box-shadow: 10px 10px 0 rgba(0,0,0,0.5); font-family: 'Tahoma', sans-serif;
+        }
+
+        .achievements-header {
+            background: darkblue; color: white; padding: 5px 10px; font-weight: bold;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        
+        .achievement-list { padding: 10px; background: #fff; border: 2px inset #fff; margin: 5px; }
+        .achievement-item {
+            display: flex; align-items: center; padding: 10px; border-bottom: 1px dashed #ccc;
+            opacity: 0.5; filter: grayscale(100%);
+        }
+        .achievement-item.unlocked { opacity: 1; filter: grayscale(0%); background: #f0f8ff; }
+        .ach-icon { font-size: 1.5rem; margin-right: 10px; }
+        .ach-details h4 { margin: 0 0 5px 0; color: darkblue; text-align: left; }
+        .ach-details p { margin: 0; font-size: 0.8rem; color: #333; text-align: left; }
+
+        .toast-container {
+            position: fixed; bottom: 20px; right: 20px; z-index: 4000;
+            display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+        }
+        .retro-toast {
+            background: #fff; border: 3px solid var(--accent-orange); padding: 10px 15px;
+            box-shadow: 4px 4px 0 #000; font-family: 'Courier New', monospace; font-weight: bold;
+            animation: slideIn 0.3s ease-out forwards, fadeOut 0.5s ease-in 4.5s forwards;
+            text-align: left;
+        }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOut { to { opacity: 0; } }
+
         /* Donation Footer Styles */
         .app-footer {
             position: fixed;
@@ -761,6 +808,9 @@
                 transform: translateY(-2px);
                 box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.25);
             }
+            .stats-tracker {
+                position: relative; top: 0; right: 0; margin: 15px auto; width: max-content;
+            }
         }
 
         @media (max-width: 600px) {
@@ -827,9 +877,20 @@
 </head>
 <body>
 
-    <div style="position: absolute; top: 15px; right: 15px; background: #ffffff; padding: 8px 12px; border: 2px solid var(--border-hard); border-radius: 0px; box-shadow: 4px 4px 0px rgba(0,0,0,0.2); font-weight: bold; font-family: 'Courier New', monospace; z-index: 100;">
+    <div class="stats-tracker">
         🏆 Scans: <span id="scan-count-display">0</span>
+        <button onclick="document.getElementById('achievementsModal').style.display='block'" style="display:block; margin-top:5px; width:100%; background:var(--accent-blue); color:white; border:1px solid #000; cursor:pointer; font-family:inherit;">View Achievements</button>
     </div>
+
+    <div id="achievementsModal" class="achievements-modal">
+        <div class="achievements-header">
+            <span>🏅 Player Unlocks</span>
+            <button onclick="document.getElementById('achievementsModal').style.display='none'" style="cursor:pointer; background:#c0c0c0; border:2px solid; border-color:#fff #808080 #808080 #fff; font-weight:bold; color:#000;">X</button>
+        </div>
+        <div class="achievement-list" id="achievementListUI"></div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
 
     <div class="bg-layer" id="bgLayer">
         <div class="bg-window win-1 contact-tab" style="top: 8%; left: 6%; width: 320px; height: auto;">
@@ -953,6 +1014,112 @@
         let currentZoomCardData = null;
         let showingBackFace = false;
 
+        // ============= MASTER ACHIEVEMENT SYSTEM =============
+        const ACHIEVEMENTS = [
+            { id: "first_scan", icon: "🃏", title: "Cracking the Pack", desc: "Scan your first card.", req: 1, type: "scan", desktopOnly: false },
+            { id: "draft_chaff", icon: "📦", title: "Draft Chaff", desc: "Scan 10 cards.", req: 10, type: "scan", desktopOnly: false },
+            { id: "ur_dragon", icon: "🐉", title: "The Ur-Dragon's Hoard", desc: "Scan 50 cards.", req: 50, type: "scan", desktopOnly: false },
+            { id: "zadas_legion", icon: "⚡", title: "Zada's Legion", desc: "Scan 100 cards.", req: 100, type: "scan", desktopOnly: false },
+            // Esoteric Desktop-Only Events
+            { id: "ettin_throne", icon: "🪞", title: "Ettin's Throne", desc: "Use the flip mechanic to view a back face.", type: "event", desktopOnly: true },
+            { id: "alaundo_tap", icon: "⏳", title: "Alaundo's Insight", desc: "Remove the counters by clicking the empty background 10 times.", type: "event", desktopOnly: true },
+            { id: "giant_bee", icon: "🐝", title: "Giant Bee Myth", desc: "Set strictness to 2.0. You might as well scan a Giant Bee.", type: "event", desktopOnly: true },
+            { id: "badgermole", icon: "🪨", title: "Badgermole Earthbend", desc: "Earthbend your way to 30 results. (No card draw included).", type: "event", desktopOnly: true },
+            { id: "outcaster", icon: "🌠", title: "Outcaster Trailblazer", desc: "Drag an image over the Contact window. No meteor tokens generated.", type: "event", desktopOnly: true }
+        ];
+
+        let scanCount = parseInt(localStorage.getItem('mtgScanCount') || '0');
+        let unlockedAch = JSON.parse(localStorage.getItem('mtgAchievements') || '[]');
+        
+        document.getElementById('scan-count-display').innerText = scanCount;
+
+        function isDesktop() { return window.innerWidth > 768; }
+
+        function showToast(title, icon) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'retro-toast';
+            toast.innerHTML = `<span style="color:var(--accent-orange)">⭐ ACHIEVEMENT UNLOCKED!</span><br>${icon} ${title}`;
+            container.appendChild(toast);
+            setTimeout(() => { if(toast.parentNode) toast.parentNode.removeChild(toast); }, 5000);
+        }
+
+        function unlockAchievement(id) {
+            const ach = ACHIEVEMENTS.find(a => a.id === id);
+            if (!ach || unlockedAch.includes(id)) return;
+            if (ach.desktopOnly && !isDesktop()) return;
+
+            unlockedAch.push(id);
+            localStorage.setItem('mtgAchievements', JSON.stringify(unlockedAch));
+            showToast(ach.title, ach.icon);
+            renderAchievements();
+        }
+
+        function trackScan() {
+            scanCount++;
+            localStorage.setItem('mtgScanCount', scanCount);
+            document.getElementById('scan-count-display').innerText = scanCount;
+
+            ACHIEVEMENTS.filter(a => a.type === "scan").forEach(ach => {
+                if (scanCount >= ach.req) unlockAchievement(ach.id);
+            });
+        }
+
+        function renderAchievements() {
+            const listUI = document.getElementById('achievementListUI');
+            if (!listUI) return;
+            listUI.innerHTML = '';
+            
+            ACHIEVEMENTS.forEach(ach => {
+                const isUnlocked = unlockedAch.includes(ach.id);
+                if (ach.desktopOnly && !isDesktop() && !isUnlocked) return; 
+
+                const el = document.createElement('div');
+                el.className = `achievement-item ${isUnlocked ? 'unlocked' : ''}`;
+                
+                const title = isUnlocked ? ach.title : "???";
+                const desc = isUnlocked ? ach.desc : (ach.desktopOnly ? "Hidden (Desktop Only)" : "Keep scanning to unlock.");
+                
+                el.innerHTML = `
+                    <div class="ach-icon">${ach.icon}</div>
+                    <div class="ach-details">
+                        <h4 style="margin: 0 0 5px 0; color: darkblue;">${title}</h4>
+                        <p style="margin: 0; font-size: 0.8rem; color: #333;">${desc}</p>
+                    </div>
+                `;
+                listUI.appendChild(el);
+            });
+        }
+        
+        renderAchievements();
+
+        // ============= ESOTERIC EVENT LISTENERS =============
+        
+        // 1. Alaundo's Insight
+        let bgClicks = 0;
+        document.body.addEventListener('click', (e) => {
+            if (e.target === document.body) {
+                bgClicks++;
+                if (bgClicks >= 10) unlockAchievement('alaundo_tap');
+            }
+        });
+
+        // 2. Giant Bee Myth
+        document.getElementById('leniencySlider').addEventListener('change', function() {
+            if (parseFloat(this.value) >= 2.0) unlockAchievement('giant_bee');
+        });
+
+        // 3. Badgermole Earthbend
+        document.getElementById('maxResults').addEventListener('change', function() {
+            if (parseInt(this.value, 10) >= 30) unlockAchievement('badgermole');
+        });
+
+        // 4. Outcaster Trailblazer
+        const contactWin = document.querySelector('.contact-tab');
+        if (contactWin) {
+            contactWin.addEventListener('dragover', () => unlockAchievement('outcaster'));
+        }
+
         // ============= QUICK FILTERS =============
         function setPreset(val) {
             const slider = document.getElementById('leniencySlider');
@@ -960,29 +1127,13 @@
             if(slider && display) {
                 slider.value = val;
                 display.innerText = val.toFixed(1);
+                if (val >= 2.0) unlockAchievement('giant_bee');
             }
         }
 
         document.getElementById('leniencySlider').addEventListener('input', function() {
             document.getElementById('leniencyValue').innerText = parseFloat(this.value).toFixed(1);
         });
-
-        // ============= ACHIEVEMENTS TRACKER =============
-        let scanCount = parseInt(localStorage.getItem('mtgScanCount') || '0');
-        document.getElementById('scan-count-display').innerText = scanCount;
-
-        function trackSuccessfulScan() {
-            scanCount++;
-            localStorage.setItem('mtgScanCount', scanCount);
-            document.getElementById('scan-count-display').innerText = scanCount;
-
-            setTimeout(() => {
-                if (scanCount === 1) alert("🏆 Achievement Unlocked: Cracking the Pack! (First Scan)");
-                if (scanCount === 10) alert("🏆 Achievement Unlocked: Draft Chaff! (10 Scans)");
-                if (scanCount === 50) alert("🏆 Achievement Unlocked: The Ur-Dragon's Hoard! (50 Scans)");
-                if (scanCount === 100) alert("🏆 Achievement Unlocked: Zada's Legion! (100 Scans)");
-            }, 500);
-        }
 
         controlsContainer.addEventListener('click', e => e.stopPropagation());
 
@@ -1065,7 +1216,7 @@
                 if (!response.ok) throw new Error("Backend error.");
                 const data = await response.json();
                 
-                trackSuccessfulScan(); // Trigger achievement tracking
+                trackScan(); 
 
                 let displayedCount = 0;
 
@@ -1201,6 +1352,8 @@
         flipBtn.addEventListener('click', () => {
             if (!currentZoomCardData || !currentZoomCardData.card_faces) return;
             
+            unlockAchievement('ettin_throne');
+
             const frontFace = currentZoomCardData.card_faces[0];
             const backFace = currentZoomCardData.card_faces[1];
             
