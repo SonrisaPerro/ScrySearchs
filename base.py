@@ -1,163 +1,124 @@
-﻿import argparse
+import argparse
+import gzip
 import json
 import logging
-from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from io import BytesIO
 from typing import Dict, List, Optional
 
 import faiss
 import numpy as np
 import requests
 from PIL import Image
-from io import BytesIO
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
-ROOT_DIR = Path(__file__).resolve().parent
-IMAGE_DIR = ROOT_DIR / "images"
-INDEX_PATH = ROOT_DIR / "scryfall_index.faiss"
-MODEL_DIR = ROOT_DIR / "clip-model"
-MAPPING_PATH = ROOT_DIR / "id_mapping.json"
-IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+from assets import INDEX_PATH, MAPPING_PATH, MODEL_NAME, ensure_assets
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-USER_AGENT = "MTGReverseImageSearch/1.0 (contact@example.com)"
+USER_AGENT = "ScrySearchs/1.0 (https://github.com/SonrisaPerro/ScrySearchs)"
 BULK_META_URL = "https://api.scryfall.com/bulk-data"
+BATCH_SIZE = 64
+DOWNLOAD_WORKERS = 8  # Scryfall's image CDN isn't rate limited, only api.scryfall.com is
 
 
-def load_clip_model(model_path: Path) -> SentenceTransformer:
-    if not model_path.exists():
-        raise FileNotFoundError(f"CLIP model directory not found: {model_path}")
-
-    logger.info("Loading CLIP model from %s", model_path)
-    return SentenceTransformer(str(model_path))
-
-
-def fetch_bulk_cards(session: requests.Session) -> List[Dict[str, any]]:
-    logger.info("Fetching Scryfall bulk data metadata")
-    response = session.get(BULK_META_URL)
+def fetch_artworks(session: requests.Session) -> List[Dict[str, str]]:
+    """One entry per illustration, from Scryfall's unique_artwork bulk file."""
+    bulk_types = session.get(BULK_META_URL).json()["data"]
+    url = next(b["jsonl_download_uri"] for b in bulk_types if b["type"] == "unique_artwork")
+    logger.info("Downloading %s", url)
+    response = session.get(url)
     response.raise_for_status()
 
-    bulk_types = response.json().get("data", [])
-    default_cards = next((item for item in bulk_types if item.get("type") == "default_cards"), None)
-    if default_cards is None:
-        raise RuntimeError("Could not find default_cards bulk data in Scryfall response.")
+    artworks: Dict[str, Dict[str, str]] = {}
+    for line in gzip.decompress(response.content).splitlines():
+        card = json.loads(line)
+        # Split/flip/adventure cards share one image; double-faced cards have one per face.
+        faces = [card] if "image_uris" in card else card.get("card_faces", [])
+        for face in faces:
+            art_id = face.get("illustration_id")
+            art_url = (face.get("image_uris") or {}).get("art_crop")
+            if art_id and art_url and art_id not in artworks:
+                name = card["name"] if face is card else f"{card['name']} ({face['name']})"
+                artworks[art_id] = {"scryfall_id": card["id"], "name": name,
+                                    "illustration_id": art_id, "art_url": art_url}
 
-    download_url = default_cards["download_uri"]
-    logger.info("Downloading card catalog from %s", download_url)
-
-    response = session.get(download_url)
-    response.raise_for_status()
-    return response.json()
+    # Stable order, so an unchanged catalog produces a byte-identical mapping.
+    return sorted(artworks.values(), key=lambda a: (a["name"], a["illustration_id"]))
 
 
-def gather_unique_artwork(cards_data: List[Dict[str, any]]) -> List[Dict[str, str]]:
-    unique_art_cards: Dict[str, Dict[str, str]] = {}
-    for card in cards_data:
-        if "image_uris" in card and card["image_uris"].get("art_crop"):
-            art_id = card.get("illustration_id")
-            if art_id and art_id not in unique_art_cards:
-                unique_art_cards[art_id] = {
-                    "scryfall_id": card["id"],
-                    "name": card["name"],
-                    "art_url": card["image_uris"]["art_crop"],
-                }
-
-        elif "card_faces" in card:
-            for face in card["card_faces"]:
-                if face.get("image_uris") and face["image_uris"].get("art_crop"):
-                    art_id = face.get("illustration_id")
-                    if art_id and art_id not in unique_art_cards:
-                        unique_art_cards[art_id] = {
-                            "scryfall_id": card["id"],
-                            "name": f"{card['name']} ({face['name']})",
-                            "art_url": face["image_uris"]["art_crop"],
-                        }
-
-    return list(unique_art_cards.values())
+def load_previous_vectors() -> Dict[str, np.ndarray]:
+    if not (INDEX_PATH.exists() and MAPPING_PATH.exists()):
+        return {}
+    index = faiss.read_index(str(INDEX_PATH))
+    mapping = json.loads(MAPPING_PATH.read_text(encoding="utf-8"))
+    vectors = index.reconstruct_n(0, index.ntotal)
+    return {entry["illustration_id"]: vectors[i]
+            for i, entry in enumerate(mapping) if entry.get("illustration_id")}
 
 
 def download_image(session: requests.Session, url: str) -> Optional[Image.Image]:
     try:
-        response = session.get(url, timeout=10)
+        response = session.get(url, timeout=20)
         response.raise_for_status()
         return Image.open(BytesIO(response.content)).convert("RGB")
     except Exception as exc:
-        logger.debug("Failed to download image %s: %s", url, exc)
+        logger.warning("Failed to download %s: %s", url, exc)
         return None
 
 
-def build_embeddings(
-    session: requests.Session,
-    model: SentenceTransformer,
-    cards: List[Dict[str, str]],
-    limit: Optional[int] = None,
-) -> (np.ndarray, List[Dict[str, str]]):
-    embeddings: List[np.ndarray] = []
-    id_mapping: List[Dict[str, str]] = []
-
-    cards_to_process = cards[:limit] if limit is not None else cards
-
-    logger.info("Processing %d artworks", len(cards_to_process))
-    for card in tqdm(cards_to_process, desc="Embedding images", unit="cards"):
-        image = download_image(session, card["art_url"])
-        if image is None:
-            continue
-
-        try:
-            embedding = model.encode([image], convert_to_numpy=True)
-            embedding = np.asarray(embedding, dtype="float32")
-            if embedding.ndim == 2:
-                embedding = embedding[0]
-
-            embeddings.append(embedding)
-            id_mapping.append({"scryfall_id": card["scryfall_id"], "name": card["name"]})
-        except Exception as exc:
-            logger.debug("Skipping artwork %s due to embed error: %s", card["art_url"], exc)
-            continue
-
-    if not embeddings:
-        raise RuntimeError("No embeddings were generated. Check download and model configuration.")
-
-    embedding_matrix = np.vstack(embeddings)
-    faiss.normalize_L2(embedding_matrix)
-    return embedding_matrix, id_mapping
+def embed_artworks(session: requests.Session, model: SentenceTransformer,
+                   artworks: List[Dict[str, str]]) -> Dict[str, np.ndarray]:
+    vectors: Dict[str, np.ndarray] = {}
+    with ThreadPoolExecutor(DOWNLOAD_WORKERS) as pool, tqdm(total=len(artworks), desc="Embedding", unit="art") as bar:
+        # One batch in memory at a time; pool.map over everything would buffer every image.
+        for start in range(0, len(artworks), BATCH_SIZE):
+            batch = artworks[start:start + BATCH_SIZE]
+            images = list(pool.map(lambda a: download_image(session, a["art_url"]), batch))
+            # Failed downloads are skipped this run and retried on the next refresh.
+            ok = [(a["illustration_id"], img) for a, img in zip(batch, images) if img is not None]
+            if ok:
+                embedded = model.encode([img for _, img in ok], batch_size=BATCH_SIZE, convert_to_numpy=True,
+                                        show_progress_bar=False)
+                embedded = np.asarray(embedded, dtype="float32")
+                faiss.normalize_L2(embedded)
+                vectors.update(zip([art_id for art_id, _ in ok], embedded))
+            bar.update(len(batch))
+    return vectors
 
 
-def build_index(embeddings_matrix: np.ndarray) -> faiss.IndexFlatIP:
-    dimension = embeddings_matrix.shape[1]
-    index = faiss.IndexFlatIP(dimension)
-    index.add(embeddings_matrix)
-    return index
+def main(full: bool = False, limit: Optional[int] = None) -> None:
+    if not full:
+        ensure_assets()
+    previous = {} if full else load_previous_vectors()
 
-
-def save_artifacts(index: faiss.IndexFlatIP, id_mapping: List[Dict[str, str]]) -> None:
-    faiss.write_index(index, str(INDEX_PATH))
-    with MAPPING_PATH.open("w", encoding="utf-8") as f:
-        json.dump(id_mapping, f, indent=2)
-
-
-def main(limit: Optional[int] = None) -> None:
-    model = load_clip_model(MODEL_DIR)
     with requests.Session() as session:
-        session.headers.update({"User-Agent": USER_AGENT})
-        cards_data = fetch_bulk_cards(session)
+        session.headers.update({"User-Agent": USER_AGENT, "Accept": "*/*"})
+        artworks = fetch_artworks(session)[:limit]
+        new = [a for a in artworks if a["illustration_id"] not in previous]
+        logger.info("%d artworks on Scryfall, %d already indexed, %d to embed.",
+                    len(artworks), len(artworks) - len(new), len(new))
 
-        unique_art_cards = gather_unique_artwork(cards_data)
-        logger.info("Found %d unique artworks to index.", len(unique_art_cards))
+        if new:
+            model = SentenceTransformer(MODEL_NAME)
+            previous.update(embed_artworks(session, model, new))
 
-        embeddings_matrix, id_mapping = build_embeddings(session, model, unique_art_cards, limit=limit)
-        logger.info("Compiled %d embeddings.", len(id_mapping))
+    kept = [a for a in artworks if a["illustration_id"] in previous]
+    matrix = np.vstack([previous[a["illustration_id"]] for a in kept]).astype("float32")
+    index = faiss.IndexFlatIP(matrix.shape[1])
+    index.add(matrix)
 
-        faiss_index = build_index(embeddings_matrix)
-        save_artifacts(faiss_index, id_mapping)
-
-        logger.info("Success! Vector database saved to %s. Indexed %d cards.", INDEX_PATH, faiss_index.ntotal)
+    faiss.write_index(index, str(INDEX_PATH))
+    mapping = [{k: a[k] for k in ("scryfall_id", "name", "illustration_id")} for a in kept]
+    MAPPING_PATH.write_text(json.dumps(mapping, ensure_ascii=False), encoding="utf-8")
+    logger.info("Saved %d artworks to %s", index.ntotal, INDEX_PATH)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Build a FAISS image search index for Scryfall cards.")
-    parser.add_argument("--limit", type=int, default=None, help="Optional limit on the number of artworks to process.")
+    parser = argparse.ArgumentParser(description="Build or refresh the FAISS art index from Scryfall.")
+    parser.add_argument("--full", action="store_true", help="Re-embed everything instead of reusing the current index.")
+    parser.add_argument("--limit", type=int, default=None, help="Only index the first N artworks (for development).")
     args = parser.parse_args()
-    main(limit=args.limit)
+    main(full=args.full, limit=args.limit)

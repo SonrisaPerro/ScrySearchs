@@ -6,5 +6,4 @@ faiss-cpu
 numpy
 Pillow
 requests
-gdown
 tqdm

@@ -1,0 +1,51 @@
+name: Refresh card index
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"  # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+
+      - name: Fetch current index
+        run: |
+          python -c "import assets; assets.ensure_assets()"
+          cp id_mapping.json "$RUNNER_TEMP/previous_mapping.json"
+
+      - name: Embed new artwork
+        run: python base.py
+
+      - name: Publish a new release if anything changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if cmp -s id_mapping.json "$RUNNER_TEMP/previous_mapping.json"; then
+            echo "No new artwork on Scryfall."
+            exit 0
+          fi
+          tag="index-$(date -u +%Y-%m-%d)"
+          gh release create "$tag" scryfall_index.faiss id_mapping.json \
+            --title "Card index $(date -u +%Y-%m-%d)" \
+            --notes "$(jq length id_mapping.json) artworks. Built by the weekly refresh."
+          echo "$tag" > index_version.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Update card index to $tag"
+          git push

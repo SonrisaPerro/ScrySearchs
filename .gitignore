@@ -28,5 +28,6 @@ clip-model/
 .vscode/
 .idea/
 
-# Downloaded at startup from Google Drive
+# Published as a GitHub Release (see index_version.txt), downloaded on demand
 scryfall_index.faiss
+id_mapping.json

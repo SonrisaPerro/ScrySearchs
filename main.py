@@ -1,6 +1,5 @@
 ﻿import asyncio
 import os
-import gdown
 import json
 from collections import defaultdict, deque
 from pathlib import Path
@@ -16,10 +15,7 @@ from sentence_transformers import SentenceTransformer
 from contextlib import asynccontextmanager
 from io import BytesIO
 
-ROOT_DIR = Path(__file__).resolve().parent
-INDEX_PATH = ROOT_DIR / "scryfall_index.faiss"
-MAPPING_PATH = ROOT_DIR / "id_mapping.json"
-MODEL_DIR = ROOT_DIR / "clip-model"
+from assets import INDEX_PATH, MAPPING_PATH, MODEL_NAME, ROOT_DIR, ensure_assets
 
 ALLOWED_ORIGINS = [origin.strip() for origin in os.getenv(
     "ALLOWED_ORIGINS",
@@ -27,6 +23,7 @@ ALLOWED_ORIGINS = [origin.strip() for origin in os.getenv(
 ).split(",") if origin.strip()]
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "30"))
 RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 index: faiss.Index = None  # type: ignore[assignment]
 model: SentenceTransformer = None  # type: ignore[assignment]
@@ -65,22 +62,16 @@ async def lifespan(app: FastAPI):
 
     print("Loading database and model into memory...")
 
-    if not MAPPING_PATH.exists():
-        raise RuntimeError(f"Missing ID mapping at {MAPPING_PATH}")
+    # A no-op in the Docker image, which bakes these in at build time.
+    ensure_assets()
 
     with MAPPING_PATH.open("r", encoding="utf-8") as f:
         id_mapping = json.load(f)
 
-    # --- CLOUD DOWNLOAD WORKAROUND ---
-    DRIVE_FILE_ID = "1LCWxaFKxKPLx4ss2uDBSuHf0oQnVIe7d"
-    if not INDEX_PATH.exists():
-        print("Downloading FAISS index from Google Drive. Please wait...")
-        download_url = f"https://drive.google.com/uc?id={DRIVE_FILE_ID}"
-        gdown.download(download_url, str(INDEX_PATH), quiet=False)
-    # ---------------------------------
-
     index = load_index(INDEX_PATH)
-    model = SentenceTransformer('clip-ViT-B-32')
+    if index.ntotal != len(id_mapping):
+        raise RuntimeError(f"Index has {index.ntotal} vectors but mapping has {len(id_mapping)} entries.")
+    model = SentenceTransformer(MODEL_NAME)
 
     print(f"Backend ready! Loaded {index.ntotal} cards into memory.")
     yield
@@ -100,7 +91,8 @@ app.add_middleware(
 
 @app.middleware("http")
 async def simple_rate_limiter(request: Request, call_next):
-    client_ip = request.client.host if request.client else "unknown"
+    # Behind Railway's proxy request.client is the proxy; Railway puts the visitor in X-Real-IP.
+    client_ip = request.headers.get("x-real-ip") or (request.client.host if request.client else "unknown")
     now = asyncio.get_event_loop().time()
     window_start = now - RATE_LIMIT_WINDOW
 
@@ -120,8 +112,9 @@ async def simple_rate_limiter(request: Request, call_next):
     return await call_next(request)
 
 
+# Plain def: FastAPI runs it in a worker thread, so CLIP inference doesn't block other requests.
 @app.post("/search")
-async def search_image(
+def search_image(
     file: UploadFile = File(...),
     leniency: float = Form(0.25)
 ) -> Dict[str, List[Dict[str, Any]]]:
@@ -129,8 +122,11 @@ async def search_image(
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image.")
 
+    contents = file.file.read(MAX_UPLOAD_BYTES + 1)
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Image is too large (max 20 MB).")
+
     try:
-        contents = await file.read()
         img = Image.open(BytesIO(contents)).convert("RGB")
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid or corrupt image file.")
