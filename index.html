@@ -939,25 +939,9 @@
 
     <h1>MTG Reverse Image Search</h1>
     <p>Upload artwork, a photo, or even a sketch to find the closest matching Magic cards.</p>
-    <div class="upload-container" style="margin-bottom: 20px;">
-        <h3>1. "Mood Board" Search</h3>
-        <p>Select up to 5 cards to build a visual palette. The AI will curate a gallery of cards with artwork that matches your exact aesthetic, generally.</p>
-        
-        <div style="position:relative; width:90%; max-width:500px; margin:0 auto;">
-            <input type="text" id="cardSearchText" placeholder="Type a card name to add to blend..." style="width:100%; padding:10px; border:3px solid var(--accent-blue); font-family:inherit; font-weight:bold; font-size:1rem;">
-            
-            <div id="cardSearchDropdown" style="display:none; position:absolute; top:100%; left:0; width:100%; background:#fff; border:3px solid var(--accent-blue); border-top:none; z-index:1000; max-height:200px; overflow-y:auto; text-align:left; box-shadow: 4px 4px 0px rgba(0,0,0,0.2);">
-                </div>
-        </div>
-
-        <div id="blendRow" style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:15px; min-height:50px;">
-            </div>
-
-        <button class="upload-btn" id="blendBtn" style="margin-top:15px; display:none; background: linear-gradient(180deg, #9933ff 0%, #6600cc 100%);">Generate Moodboard</button>
-    </div>
 
     <div class="upload-container" id="dropZone">
-        <h3>2. Search with an Image</h3>
+        <h3>1. Search with an Image</h3>
         <p>Drag an image here OR paste from clipboard OR use the button.</p>
         <label for="imageUpload" class="upload-btn">Choose an Image File...</label>
         <input type="file" id="imageUpload" accept="image/*">
@@ -979,13 +963,13 @@
             
             <div class="controls-row">
                 <div style="display: flex; gap: 5px;">
-                    <button type="button" class="preset-btn" onclick="setPreset(0.3)">Strict</button>
-                    <button type="button" class="preset-btn" onclick="setPreset(1.0)">Standard</button>
-                    <button type="button" class="preset-btn" onclick="setPreset(1.8)">Loose</button>
+                    <button type="button" class="preset-btn" onclick="setPreset(0.15)">Strict</button>
+                    <button type="button" class="preset-btn" onclick="setPreset(0.25)">Standard</button>
+                    <button type="button" class="preset-btn" onclick="setPreset(0.4)">Loose</button>
                 </div>
                 <label style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                    <span>Leniency: <span id="leniencyValue">1.0</span></span>
-                    <input type="range" id="leniencySlider" min="0.1" max="2.0" step="0.1" value="1.0" style="width: 120px;">
+                    <span>Leniency: <span id="leniencyValue">0.25</span></span>
+                    <input type="range" id="leniencySlider" min="0.05" max="0.5" step="0.01" value="0.25" style="width: 120px;">
                 </label>
             </div>
         </div>
@@ -1016,6 +1000,9 @@
         // 🚨 CONFIGURATION FOR AFFILIATE LINKING
         const IMPACT_AFFILIATE_REDIRECT = ""; 
 
+        // GitHub Pages copy has no backend; everywhere else the page is served by main.py itself.
+        const API_BASE = location.hostname.endsWith('github.io') ? 'https://scryfallsearch.up.railway.app' : '';
+
         const imageUpload = document.getElementById('imageUpload');
         const preview = document.getElementById('preview');
         const resultsContainer = document.getElementById('results');
@@ -1042,7 +1029,7 @@
             { id: "zadas_legion", icon: "⚡", title: "Zada's Legion", desc: "Scan 100 cards.", req: 100, type: "scan", desktopOnly: false },
             { id: "ettin_throne", icon: "🪞", title: "Ettin's Throne", desc: "Use the flip mechanic to view a back face.", type: "event", desktopOnly: true },
             { id: "alaundo_tap", icon: "⏳", title: "Alaundo's Insight", desc: "Remove the counters by clicking the empty background 10 times.", type: "event", desktopOnly: true },
-            { id: "giant_bee", icon: "🐝", title: "Giant Bee Myth", desc: "Set strictness to 2.0. You might as well scan a Giant Bee.", type: "event", desktopOnly: true },
+            { id: "giant_bee", icon: "🐝", title: "Giant Bee Myth", desc: "Max out the leniency slider. You might as well scan a Giant Bee.", type: "event", desktopOnly: true },
             { id: "badgermole", icon: "🪨", title: "Badgermole Earthbend", desc: "Earthbend your way to 30 results. (No card draw included).", type: "event", desktopOnly: true },
             { id: "outcaster", icon: "🌠", title: "Outcaster Trailblazer", desc: "Drag an image over the Contact window. No meteor tokens generated.", type: "event", desktopOnly: true }
         ];
@@ -1122,7 +1109,7 @@
         });
 
         document.getElementById('leniencySlider').addEventListener('change', function() {
-            if (parseFloat(this.value) >= 2.0) unlockAchievement('giant_bee');
+            if (parseFloat(this.value) >= parseFloat(this.max)) unlockAchievement('giant_bee');
         });
 
         document.getElementById('maxResults').addEventListener('change', function() {
@@ -1140,13 +1127,13 @@
             const display = document.getElementById('leniencyValue');
             if(slider && display) {
                 slider.value = val;
-                display.innerText = val.toFixed(1);
-                if (val >= 2.0) unlockAchievement('giant_bee');
+                display.innerText = val.toFixed(2);
+                if (val >= parseFloat(slider.max)) unlockAchievement('giant_bee');
             }
         }
 
         document.getElementById('leniencySlider').addEventListener('input', function() {
-            document.getElementById('leniencyValue').innerText = parseFloat(this.value).toFixed(1);
+            document.getElementById('leniencyValue').innerText = parseFloat(this.value).toFixed(2);
         });
 
         controlsContainer.addEventListener('click', e => e.stopPropagation());
@@ -1211,7 +1198,7 @@
             formData.append('leniency', currentLeniency);
 
             try {
-                const response = await fetch('https://scryfallsearch.up.railway.app/search', {
+                const response = await fetch(`${API_BASE}/search`, {
                     method: 'POST',
                     body: formData
                 });
@@ -1364,178 +1351,6 @@
             }
             
             showingBackFace = !showingBackFace;
-        });
-
-        // ============= MOODBOARD LOGIC WITH SCYFALL CHUNKING =============
-        let blendQueueCards = []; 
-        const searchInput = document.getElementById('cardSearchText');
-        const searchDropdown = document.getElementById('cardSearchDropdown');
-        const blendRow = document.getElementById('blendRow');
-        const blendBtn = document.getElementById('blendBtn');
-
-        searchInput.addEventListener('input', async (e) => {
-            const q = e.target.value;
-            if(q.length < 3) { searchDropdown.style.display = 'none'; return; }
-            
-            const res = await fetch(`https://api.scryfall.com/cards/autocomplete?q=${q}`);
-            const data = await res.json();
-            
-            searchDropdown.innerHTML = '';
-            data.data.forEach(name => {
-                const div = document.createElement('div');
-                div.textContent = name;
-                div.style.padding = "8px 12px"; div.style.cursor = "pointer"; div.style.borderBottom = "1px dashed #ccc";
-                div.onmouseover = () => div.style.background = "var(--surface-hover)";
-                div.onmouseout = () => div.style.background = "transparent";
-                div.onclick = () => addCardToBlend(name);
-                searchDropdown.appendChild(div);
-            });
-            searchDropdown.style.display = 'block';
-        });
-
-        async function addCardToBlend(name) {
-            if(blendQueueCards.length >= 5) { alert("Maximum 5 cards allowed for vibe math!"); return; }
-            
-            searchInput.value = ''; searchDropdown.style.display = 'none';
-            
-            const res = await fetch(`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`);
-            const card = await res.json();
-            
-            let imgUrl = '';
-            if (card.image_uris && card.image_uris.normal) { imgUrl = card.image_uris.normal; } 
-            else if (card.card_faces && card.card_faces[0].image_uris) { imgUrl = card.card_faces[0].image_uris.normal; }
-
-            if(imgUrl) {
-                blendQueueCards.push({ name: card.name, url: imgUrl });
-                
-                const imgThumb = document.createElement('img');
-                imgThumb.src = imgUrl; imgThumb.style = "width:80px; border-radius:5px; border:2px solid #000; box-shadow:2px 2px 0px rgba(0,0,0,0.5); cursor:pointer;";
-                imgThumb.title = "Click to remove";
-                
-                imgThumb.onclick = () => {
-                    blendQueueCards = blendQueueCards.filter(c => c.url !== imgUrl);
-                    blendRow.removeChild(imgThumb);
-                    if(blendQueueCards.length === 0) blendBtn.style.display = 'none';
-                };
-                
-                blendRow.appendChild(imgThumb); blendBtn.style.display = 'inline-block';
-            }
-        }
-
-        blendBtn.addEventListener('click', async () => {
-            if(blendQueueCards.length === 0) return;
-            
-            const maxResults = parseInt(document.getElementById('maxResults').value, 10);
-            const currentLeniency = document.getElementById('leniencySlider').value;
-
-            resultsContainer.innerHTML = ''; loading.style.display = 'block'; 
-
-            const formData = new FormData();
-            formData.append('urls', blendQueueCards.map(c => c.url).join(','));
-            formData.append('leniency', currentLeniency);
-
-            try {
-                const response = await fetch('https://scryfallsearch.up.railway.app/blend', {
-                    method: 'POST', body: formData
-                });
-
-                if (!response.ok) throw new Error("Backend error.");
-                const data = await response.json();
-                trackScan(); 
-
-                // Pre-filter: Remove any matches that share a name with our input cards
-                let freshMatches = data.matches.filter(match => {
-                    return !blendQueueCards.some(inputCard => 
-                        match.name.includes(inputCard.name) || inputCard.name.includes(match.name)
-                    );
-                });
-
-                if (freshMatches.length === 0) {
-                    resultsContainer.innerHTML = '<p style="grid-column: 1/-1; text-align: center; font-weight: bold; margin-top: 2rem;">No new stylistic matches found outside of inputs. Try loosening the Leniency slider!</p>';
-                    loading.style.display = 'none';
-                    return;
-                }
-
-                const shouldFilter = document.getElementById('filterCommander').checked;
-                let displayedCount = 0;
-
-                // Chunk into arrays of 75 to respect Scryfall's bulk limit
-                const chunks = [];
-                for (let i = 0; i < freshMatches.length; i += 75) {
-                    chunks.push(freshMatches.slice(i, i + 75));
-                }
-
-                for (const chunk of chunks) {
-                    if (displayedCount >= maxResults) break;
-
-                    const identifiers = chunk.map(match => ({ id: match.scryfall_id }));
-                    
-                    const scryfallRes = await fetch('https://api.scryfall.com/cards/collection', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ identifiers: identifiers })
-                    });
-
-                    if (!scryfallRes.ok) {
-                        console.error("Scryfall skipped a chunk due to API limits or invalid IDs.");
-                        continue; 
-                    }
-
-                    const scryfallBulkData = await scryfallRes.json();
-                    const scryfallDict = {};
-                    if (scryfallBulkData.data) { scryfallBulkData.data.forEach(c => { scryfallDict[c.id] = c; }); }
-
-                    for (const match of chunk) {
-                        if (displayedCount >= maxResults) break; 
-                        
-                        const scryfallData = scryfallDict[match.scryfall_id];
-                        if (!scryfallData) continue; 
-
-                        if (shouldFilter) {
-                            const layout = scryfallData.layout || '';
-                            const commanderLegality = scryfallData.legalities ? scryfallData.legalities.commander : 'not_legal';
-                            const isNonStandardLayout = ['token', 'double_faced_token', 'art_series', 'emblem', 'planar', 'vanguard', 'scheme'].includes(layout);
-                            if (isNonStandardLayout || commanderLegality === 'not_legal') continue; 
-                        }
-
-                        let imageUrl = scryfallData.image_uris ? scryfallData.image_uris.normal : (scryfallData.card_faces ? scryfallData.card_faces[0].image_uris.normal : '');
-
-                        const cardDiv = document.createElement('div'); cardDiv.className = 'card';
-                        const imgElement = document.createElement('img'); imgElement.src = imageUrl;
-                        imgElement.scryfallData = scryfallData; imgElement.matchName = match.name; imgElement.matchScore = `Blend Score: ${(match.similarity_score * 100).toFixed(1)}%`;
-                        imgElement.addEventListener('click', activateZoomOverlay);
-                        
-                        const contentWrapper = document.createElement('div'); contentWrapper.style = "padding:12px; display:flex; flex-direction:column; flex-grow:1;";
-                        const nameElement = document.createElement('strong'); nameElement.textContent = match.name;
-                        const scoreElement = document.createElement('div'); scoreElement.className = 'score'; scoreElement.textContent = imgElement.matchScore;
-
-                        cardDiv.appendChild(imgElement); contentWrapper.appendChild(nameElement);
-                        if (scryfallData.legalities && scryfallData.legalities.commander === 'banned') {
-                            const bannedBadge = document.createElement('div'); bannedBadge.className = 'badge'; bannedBadge.textContent = 'BANNED IN EDH'; contentWrapper.appendChild(bannedBadge);
-                        }
-                        contentWrapper.appendChild(scoreElement);
-
-                        const rawTcgUrl = scryfallData.purchase_uris ? scryfallData.purchase_uris.tcgplayer : null;
-                        if (rawTcgUrl) {
-                            const buyBtn = document.createElement('a'); buyBtn.className = 'buy-btn'; buyBtn.textContent = 'Buy on TCGplayer'; buyBtn.target = '_blank';
-                            buyBtn.href = cleanAndWrapTcgUrl(rawTcgUrl); buyBtn.addEventListener('click', e => e.stopPropagation()); contentWrapper.appendChild(buyBtn);
-                        }
-                        cardDiv.appendChild(contentWrapper); resultsContainer.appendChild(cardDiv);
-                        displayedCount++;
-                    }
-                }
-
-                if (displayedCount === 0) {
-                    resultsContainer.innerHTML = '<p style="grid-column: 1/-1; font-weight: bold; text-align: center; margin-top: 2rem;">No aesthetic matches passed your current filters. Try unchecking "Exclude Tokens" or loosening the Leniency slider!</p>';
-                } else if (displayedCount < maxResults) {
-                    const endMsg = document.createElement('p');
-                    endMsg.style.cssText = "grid-column: 1/-1; text-align: center; font-weight: bold; margin-top: 2rem; opacity: 0.7;";
-                    endMsg.textContent = "End of high-confidence aesthetic matches. Loosen the Leniency slider to see more!";
-                    resultsContainer.appendChild(endMsg);
-                }
-
-            } catch (error) {
-                alert("Error running Moodboard Search. Check backend logs."); console.error(error);
-            } finally { loading.style.display = 'none'; }
         });
 
         // ============= REACTIVE BACKGROUND LOGIC =============

@@ -2,7 +2,6 @@
 import os
 import gdown
 import json
-import requests
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Dict, Deque, List
@@ -35,6 +34,18 @@ id_mapping: List[Dict[str, Any]] = []
 
 rate_limit_store: Dict[str, Deque[float]] = defaultdict(deque)
 rate_limit_lock = asyncio.Lock()
+
+
+# Real cards are 63x88mm (0.716); the range allows for screenshot margins.
+CARD_ASPECT_RANGE = (0.62, 0.80)
+# Art box of a standard (1993-2015+) frame, as fractions of the full card.
+ART_BOX = (0.08, 0.11, 0.92, 0.555)
+
+
+def crop_art_box(img: Image.Image) -> Image.Image:
+    w, h = img.size
+    left, top, right, bottom = ART_BOX
+    return img.crop((int(w * left), int(h * top), int(w * right), int(h * bottom)))
 
 
 def load_index(path: Path) -> faiss.Index:
@@ -112,7 +123,7 @@ async def simple_rate_limiter(request: Request, call_next):
 @app.post("/search")
 async def search_image(
     file: UploadFile = File(...),
-    leniency: float = Form(1.0)
+    leniency: float = Form(0.25)
 ) -> Dict[str, List[Dict[str, Any]]]:
     
     if not file.content_type or not file.content_type.startswith("image/"):
@@ -124,11 +135,13 @@ async def search_image(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid or corrupt image file.")
 
-    embedding = model.encode([img], convert_to_numpy=True)
-    if embedding.ndim == 2:
-        embedding = embedding[0]
+    # The index holds art crops only, so a full-card upload (screenshot/scan) also gets
+    # searched as its art box; each card keeps its better score.
+    queries = [img]
+    if CARD_ASPECT_RANGE[0] <= img.width / img.height <= CARD_ASPECT_RANGE[1]:
+        queries.append(crop_art_box(img))
 
-    embedding_matrix = np.asarray([embedding], dtype="float32")
+    embedding_matrix = np.asarray(model.encode(queries, convert_to_numpy=True), dtype="float32")
     faiss.normalize_L2(embedding_matrix)
 
     k = min(30, int(index.ntotal))
@@ -137,108 +150,30 @@ async def search_image(
 
     distances, indices = index.search(embedding_matrix, k)
 
+    best: Dict[int, float] = {}
+    for score, idx in zip(distances.ravel(), indices.ravel()):
+        if 0 <= idx < len(id_mapping):
+            best[int(idx)] = max(best.get(int(idx), -1.0), float(score))
+
     results: List[Dict[str, Any]] = []
-    for score, idx in zip(distances[0], indices[0]):
-        if idx < 0 or idx >= len(id_mapping):
-            continue
-            
-        # The Leniency Filter
-        if float(score) > leniency:
+    for idx, score in sorted(best.items(), key=lambda item: item[1], reverse=True)[:k]:
+        # The Leniency Filter: IndexFlatIP scores are cosine similarity (higher = closer),
+        # so compare cosine distance (0..2) against the slider.
+        if 1.0 - score > leniency:
             continue
 
-        card_meta = id_mapping[int(idx)]
+        card_meta = id_mapping[idx]
         results.append(
             {
                 "scryfall_id": card_meta["scryfall_id"],
                 "name": card_meta["name"],
-                "similarity_score": round(float(score), 4),
+                "similarity_score": round(score, 4),
                 "api_link": f"https://api.scryfall.com/cards/{card_meta['scryfall_id']}"
             }
         )
 
     return {"matches": results}
 
-
-@app.post("/blend")
-def blend_images(
-    urls: str = Form(...),
-    leniency: float = Form(1.0)
-) -> Dict[str, List[Dict[str, Any]]]:
-    
-    url_list = [u.strip() for u in urls.split(",") if u.strip()]
-    if not url_list:
-        raise HTTPException(status_code=400, detail="No URLs provided")
-
-    embeddings = []
-    
-    # 1. Download and encode each card's art individually
-    for url in url_list:
-        try:
-            res = requests.get(url, timeout=5)
-            res.raise_for_status()
-            img = Image.open(BytesIO(res.content)).convert("RGB")
-            
-            # Get the raw math vector
-            emb = model.encode([img], convert_to_numpy=True)
-            if emb.ndim == 2:
-                emb = emb[0]
-                
-            # THE FIX: Create the array, normalize it, and explicitly save it!
-            emb_matrix = np.asarray([emb], dtype="float32")
-            faiss.normalize_L2(emb_matrix)
-            
-            # Append the normalized version to our list
-            embeddings.append(emb_matrix[0])
-        except Exception as e:
-            print(f"Skipping {url}: {e}")
-
-    if not embeddings:
-        raise HTTPException(status_code=400, detail="Failed to process images")
-
-    # 2. THE PALETTE MATH: Multi-Query Pooling
-    candidate_pool = {}
-    k_per_query = 150  # Pull the top 20 closest matches for EVERY card in the palette
-
-    for emb in embeddings:
-        # Search with our properly normalized vectors
-        query_matrix = np.asarray([emb], dtype="float32")
-        distances, indices = index.search(query_matrix, k_per_query)
-        
-        for score, idx in zip(distances[0], indices[0]):
-            if idx < 0 or idx >= len(id_mapping): 
-                continue
-                
-            # Filter out cards that exceed the user's leniency slider
-            if float(score) > leniency: 
-                continue
-                
-            scryfall_id = id_mapping[int(idx)]["scryfall_id"]
-            name = id_mapping[int(idx)]["name"]
-            
-            # 3. Deduplication & Scoring
-            if scryfall_id in candidate_pool:
-                candidate_pool[scryfall_id]["score"] = min(candidate_pool[scryfall_id]["score"], float(score))
-            else:
-                candidate_pool[scryfall_id] = {
-                    "scryfall_id": scryfall_id,
-                    "name": name,
-                    "score": float(score)
-                }
-
-    # 4. Sort the massive pool of candidates so the strongest overall matches rise to the top
-    sorted_candidates = sorted(candidate_pool.values(), key=lambda x: x["score"])
-
-    # 5. Format for the frontend
-    results: List[Dict[str, Any]] = []
-    for c in sorted_candidates:
-        results.append({
-            "scryfall_id": c["scryfall_id"],
-            "name": c["name"],
-            "similarity_score": round(c["score"], 4),
-            "api_link": f"https://api.scryfall.com/cards/{c['scryfall_id']}"
-        })
-
-    return {"matches": results}
 
 @app.get("/health")
 async def health() -> Dict[str, str]:

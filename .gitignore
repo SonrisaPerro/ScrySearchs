@@ -27,3 +27,6 @@ clip-model/
 # IDE metadata
 .vscode/
 .idea/
+
+# Downloaded at startup from Google Drive
+scryfall_index.faiss
