@@ -1,6 +1,8 @@
 ﻿import asyncio
 import os
 import json
+import threading
+import warnings
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Dict, Deque, List
@@ -24,6 +26,13 @@ ALLOWED_ORIGINS = [origin.strip() for origin in os.getenv(
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "30"))
 RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+
+# A small file can declare a huge canvas (decompression bomb). Reject past 120 MP, which
+# still admits 108 MP phone photos; PIL's default only errors at twice its warning limit.
+Image.MAX_IMAGE_PIXELS = 120_000_000
+warnings.simplefilter("error", Image.DecompressionBombWarning)
+# Decoding and CLIP are memory/CPU heavy; cap concurrent searches so bursts queue instead of OOMing.
+search_slots = threading.BoundedSemaphore(4)
 
 index: faiss.Index = None  # type: ignore[assignment]
 model: SentenceTransformer = None  # type: ignore[assignment]
@@ -83,7 +92,6 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -126,8 +134,17 @@ def search_image(
     if len(contents) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Image is too large (max 20 MB).")
 
+    with search_slots:
+        return {"matches": _search(contents, leniency)}
+
+
+def _search(contents: bytes, leniency: float) -> List[Dict[str, Any]]:
     try:
-        img = Image.open(BytesIO(contents)).convert("RGB")
+        img = Image.open(BytesIO(contents))
+        img.draft("RGB", (1024, 1024))  # JPEG decodes at reduced scale; no-op for other formats
+        img = img.convert("RGB")
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning):
+        raise HTTPException(status_code=413, detail="Image dimensions are too large (max 120 megapixels).")
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid or corrupt image file.")
 
@@ -163,12 +180,13 @@ def search_image(
             {
                 "scryfall_id": card_meta["scryfall_id"],
                 "name": card_meta["name"],
+                "illustration_id": card_meta.get("illustration_id"),
                 "similarity_score": round(score, 4),
                 "api_link": f"https://api.scryfall.com/cards/{card_meta['scryfall_id']}"
             }
         )
 
-    return {"matches": results}
+    return results
 
 
 @app.get("/health")

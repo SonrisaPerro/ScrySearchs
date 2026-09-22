@@ -57,7 +57,7 @@ A local run only changes your local copy. To ship it, create a release with both
 
 ## Deployment
 
-Railway builds the `Dockerfile` (selected in `railway.json`). The image installs CPU-only PyTorch and bakes in the model and the pinned index, so containers start without downloading anything. The page is also published on GitHub Pages, where it calls the Railway backend.
+Railway builds the `Dockerfile`. Its health check (`/health`) and watch patterns (which files trigger a redeploy) are set in the Railway service settings. The image installs CPU-only PyTorch and bakes in the model and the pinned index, so containers start without downloading anything. The page is also published on GitHub Pages, where it calls the Railway backend.
 
 Environment variables:
 

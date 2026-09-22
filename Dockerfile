@@ -11,6 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Bake the CLIP model and the pinned search index into the image so startup downloads nothing.
 COPY assets.py index_version.txt ./
 RUN python -c "import assets; assets.ensure_assets(); from sentence_transformers import SentenceTransformer; SentenceTransformer(assets.MODEL_NAME)"
+# Everything is baked in now; never contact the Hugging Face Hub at startup.
+ENV HF_HUB_OFFLINE=1
 
 COPY . .
 
