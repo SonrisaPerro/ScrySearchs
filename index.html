@@ -616,6 +616,23 @@
         .printing-buy { width: auto; margin: 0; padding: 4px 10px; }
         .printings-note { display: block; margin: 10px 4px 2px; font-size: 0.8rem; text-align: center; }
 
+        /* Which result the open printings window belongs to */
+        .card.is-active, .card.is-active:hover {
+            border-color: var(--accent-orange);
+            box-shadow: 6px 6px 0px rgba(255, 102, 0, 0.45);
+            background: #fffbe6;
+        }
+        .buy-btn.is-active, .buy-btn.is-active:hover {
+            background: #ffffcc; color: #003300; border-color: var(--accent-orange);
+            box-shadow: inset 2px 2px 0px rgba(0, 0, 0, 0.25); transform: none;
+        }
+        .printings-source {
+            display: flex; align-items: center; gap: 10px; margin: 5px 5px 0; padding: 6px;
+            background: #fff; border: 2px inset #fff; font-size: 0.8rem; text-align: left;
+        }
+        .printings-source img { width: 96px; height: auto; border: 2px solid var(--accent-orange); }
+        .printings-source:empty { display: none; }
+
         .toast-container {
             position: fixed; bottom: 20px; right: 20px; z-index: 4000;
             display: flex; flex-direction: column; gap: 10px; pointer-events: none;
@@ -927,6 +944,7 @@
             <span id="printingsTitle">💰 Printings</span>
             <button onclick="closePrintings()" style="cursor:pointer; background:#c0c0c0; border:2px solid; border-color:#fff #808080 #808080 #fff; font-weight:bold; color:#000;">X</button>
         </div>
+        <div class="printings-source" id="printingsSource"></div>
         <div class="achievement-list" id="printingsList"></div>
     </div>
 
@@ -1281,6 +1299,7 @@
         async function runSearch({ request, url, heading, labelFor }) {
             activeSearch?.abort();
             const search = activeSearch = new AbortController();
+            closePrintings();  // its tile is about to be replaced
 
             const shouldFilter = document.getElementById('filterCommander').checked;
             const maxResults = parseInt(document.getElementById('maxResults').value, 10);
@@ -1363,7 +1382,8 @@
 
                     if (match.illustration_id) {
                         contentWrapper.appendChild(tileButton('More like this', 'buy-btn alt-btn', () => showSimilar(match.illustration_id)));
-                        contentWrapper.appendChild(tileButton('Printings & prices', 'buy-btn', () => showPrintings(match.illustration_id, match.name)));
+                        const pricesBtn = tileButton('Printings & prices', 'buy-btn', () => showPrintings(match.illustration_id, match.name, cardDiv, pricesBtn));
+                        contentWrapper.appendChild(pricesBtn);
                     }
                     cardDiv.appendChild(contentWrapper); resultsContainer.appendChild(cardDiv);
                     displayedCount++;
@@ -1451,21 +1471,50 @@
         const printingsModal = document.getElementById('printingsModal');
         const printingsList = document.getElementById('printingsList');
         const printingsTitle = document.getElementById('printingsTitle');
+        const printingsSource = document.getElementById('printingsSource');
 
         function formatUsd(value) { return value ? `$${value}` : '—'; }
 
-        async function showPrintings(illustrationId, name) {
+        let activePrintings = null;  // { tile, button } of the result whose printings are showing
+
+        function markActivePrintings(tile, button) {
+            if (activePrintings) {
+                activePrintings.tile.classList.remove('is-active');
+                activePrintings.button.classList.remove('is-active');
+                activePrintings.button.textContent = 'Printings & prices';
+            }
+            activePrintings = tile ? { tile, button } : null;
+            if (!tile) return;
+            tile.classList.add('is-active');
+            button.classList.add('is-active');
+            button.textContent = '✓ Showing prices';
+        }
+
+        async function showPrintings(illustrationId, name, tile, button) {
+            markActivePrintings(tile, button);
             printingsTitle.textContent = `💰 ${name}`;
+            printingsSource.innerHTML = '';
+            const faces = tile.querySelector('img').scryfallData.card_faces || [];
+            const artUrl = tile.querySelector('img').scryfallData.image_uris?.art_crop
+                ?? faces.find(f => f.illustration_id === illustrationId)?.image_uris?.art_crop;
+            if (artUrl) {
+                const thumb = document.createElement('img'); thumb.src = artUrl; thumb.alt = '';
+                const caption = document.createElement('span'); caption.textContent = 'Every paper printing that uses this art, cheapest first.';
+                printingsSource.append(thumb, caption);
+            }
             printingsList.innerHTML = '<p class="printings-note">Loading printings…</p>';
             printingsModal.style.display = 'block';
+            const request = activePrintings;
 
             const scryfallQuery = `illustrationid:${illustrationId} -is:digital`;
             const searchUrl = `https://scryfall.com/search?${new URLSearchParams({ q: scryfallQuery, unique: 'prints', order: 'usd' })}`;
             try {
                 const res = await fetch(`https://api.scryfall.com/cards/search?${new URLSearchParams({ q: scryfallQuery, unique: 'prints', order: 'usd', dir: 'asc' })}`);
+                if (activePrintings !== request) return;  // another card's prices were opened meanwhile
                 if (res.status === 404) { printingsList.innerHTML = '<p class="printings-note">No paper printings of this art.</p>'; return; }
                 if (!res.ok) throw new Error(`Scryfall search failed (${res.status})`);
                 const data = await res.json();
+                if (activePrintings !== request) return;
 
                 printingsList.innerHTML = '';
                 for (const card of data.data) {
@@ -1494,12 +1543,16 @@
                 more.textContent = data.has_more ? `See all ${data.total_cards} printings on Scryfall ↗` : 'View on Scryfall ↗';
                 printingsList.appendChild(more);
             } catch (error) {
+                if (activePrintings !== request) return;
                 printingsList.innerHTML = '<p class="printings-note">Couldn\'t load printings from Scryfall. Please try again.</p>';
                 console.error(error);
             }
         }
 
-        function closePrintings() { printingsModal.style.display = 'none'; }
+        function closePrintings() {
+            printingsModal.style.display = 'none';
+            markActivePrintings(null);
+        }
 
         // -- ZOOM OVERLAY & INSPECTOR LOGIC --
         function activateZoomOverlay(e) {
