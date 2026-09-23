@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, Deque, List, Optional
 
 import faiss
+import torch
 import numpy as np
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -90,6 +91,12 @@ async def lifespan(app: FastAPI):
                          if entry.get("illustration_id")}
     card_colors, card_types, card_formats, card_odd = (
         np.array([entry.get(key, 0) for entry in id_mapping], dtype=np.uint8) for key in ("ci", "t", "f", "odd"))
+    # PyTorch sizes its thread pool from the host's cores, not the container's CPU allowance;
+    # oversubscribing that allowance gets the container throttled, which shows up as
+    # multi-second stalls on otherwise ~0.4 s searches.
+    host_threads = torch.get_num_threads()
+    torch.set_num_threads(int(os.getenv("TORCH_THREADS", "4")))
+    print(f"CPU cores visible: {os.cpu_count()}, torch threads: {host_threads} -> {torch.get_num_threads()}")
     model = SentenceTransformer(MODEL_NAME)
 
     print(f"Backend ready! Loaded {index.ntotal} cards into memory.")
