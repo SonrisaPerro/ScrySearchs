@@ -587,6 +587,35 @@
         .ach-details h4 { margin: 0 0 5px 0; color: darkblue; text-align: left; }
         .ach-details p { margin: 0; font-size: 0.8rem; color: #333; text-align: left; }
 
+        /* More like this: same chunky button, blue instead of green */
+        .buy-btn { width: 100%; }
+        .buy-btn + .buy-btn { margin-top: 6px; }
+        .alt-btn { background: var(--accent-blue); border-color: var(--border-hard); }
+        .alt-btn:hover { background: #33ccff; }
+
+        .text-search-box { cursor: default; }
+        .text-search-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 2; }
+        .text-search-row input {
+            flex: 1 1 260px; max-width: 460px; padding: 10px;
+            border: 3px solid var(--accent-blue); font-family: inherit; font-weight: bold; font-size: 1rem;
+        }
+        .text-search-row input:focus { outline: none; border-color: var(--accent-green); }
+
+        .results-heading {
+            grid-column: 1 / -1; margin: 0; padding: 8px 12px; text-align: center; font-weight: bold;
+            background: #ffffff; border: 3px dashed var(--accent-blue); color: var(--accent-blue);
+        }
+
+        .printings-modal { width: 520px; }
+        .printing-row {
+            display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px dashed #ccc; text-align: left;
+        }
+        .printing-info { flex: 1; display: flex; flex-direction: column; font-size: 0.8rem; }
+        .printing-info strong { color: darkblue; }
+        .printing-prices { font-family: 'Courier New', monospace; font-weight: bold; font-size: 0.8rem; white-space: nowrap; }
+        .printing-buy { width: auto; margin: 0; padding: 4px 10px; }
+        .printings-note { display: block; margin: 10px 4px 2px; font-size: 0.8rem; text-align: center; }
+
         .toast-container {
             position: fixed; bottom: 20px; right: 20px; z-index: 4000;
             display: flex; flex-direction: column; gap: 10px; pointer-events: none;
@@ -893,6 +922,14 @@
         <div class="achievement-list" id="achievementListUI"></div>
     </div>
 
+    <div id="printingsModal" class="achievements-modal printings-modal">
+        <div class="achievements-header">
+            <span id="printingsTitle">💰 Printings</span>
+            <button onclick="closePrintings()" style="cursor:pointer; background:#c0c0c0; border:2px solid; border-color:#fff #808080 #808080 #fff; font-weight:bold; color:#000;">X</button>
+        </div>
+        <div class="achievement-list" id="printingsList"></div>
+    </div>
+
     <div class="toast-container" id="toastContainer"></div>
 
     <div class="bg-layer" id="bgLayer">
@@ -976,10 +1013,19 @@
 
         <br>
         <img id="preview" alt="Image preview">
-        <div id="loading" class="loader"></div>
     </div>
 
-    <h3>2. Match Results</h3>
+    <div class="upload-container text-search-box">
+        <h3>2. Search by Description</h3>
+        <p>Describe the art you're picturing, like "a goblin riding a bomb" or "a quiet snowy forest at night".</p>
+        <form id="textSearchForm" class="text-search-row">
+            <input type="text" id="textQuery" maxlength="200" placeholder="Describe the artwork..." aria-label="Describe the artwork" required>
+            <button type="submit" class="upload-btn">Search</button>
+        </form>
+    </div>
+
+    <h3 id="resultsHeading">3. Match Results</h3>
+    <div id="loading" class="loader"></div>
     <div id="results"></div>
 
     <div class="zoom-overlay" id="zoomOverlay">
@@ -998,6 +1044,9 @@
 
    <script>
         // 🚨 CONFIGURATION FOR AFFILIATE LINKING
+        // Your TCGplayer (Impact) deep-link prefix, ending in "?u=", e.g.
+        // "https://partner.tcgplayer.com/c/<your id>/1830156/21018?u=". Left empty, buy links use
+        // Scryfall's own partner link, which lands on the product page and credits Scryfall.
         const IMPACT_AFFILIATE_REDIRECT = ""; 
 
         // GitHub Pages copy has no backend; everywhere else the page is served by main.py itself.
@@ -1017,6 +1066,9 @@
         const inspectorScore = document.getElementById('inspectorScore');
         
         const controlsContainer = document.getElementById('controlsContainer');
+        const textSearchForm = document.getElementById('textSearchForm');
+        const textQuery = document.getElementById('textQuery');
+        const resultsHeading = document.getElementById('resultsHeading');
 
         let currentZoomCardData = null;
         let showingBackFace = false;
@@ -1138,14 +1190,14 @@
 
         controlsContainer.addEventListener('click', e => e.stopPropagation());
 
+        // Scryfall's TCGplayer links are partner redirects that carry the product page in ?u=.
+        // (Stripping the whole query, as this used to, sent every buyer to the TCGplayer homepage.)
         function cleanAndWrapTcgUrl(rawScryfallTcgUrl) {
             if (!rawScryfallTcgUrl) return "#";
-            let cleanUrl = rawScryfallTcgUrl.split('?')[0];
+            if (!IMPACT_AFFILIATE_REDIRECT) return rawScryfallTcgUrl;
 
-            if (IMPACT_AFFILIATE_REDIRECT) {
-                return `${IMPACT_AFFILIATE_REDIRECT}${encodeURIComponent(cleanUrl)}`;
-            }
-            return cleanUrl;
+            const productUrl = new URL(rawScryfallTcgUrl).searchParams.get('u') || rawScryfallTcgUrl;
+            return `${IMPACT_AFFILIATE_REDIRECT}${encodeURIComponent(productUrl.split('?')[0])}`;
         }
 
         // -- DRAG & DROP LOGIC --
@@ -1204,6 +1256,10 @@
             return `${label} · ${(similarity * 100).toFixed(0)}%`;
         }
 
+        // Text scores are compressed (~0.23-0.34 for a whole top 30), so they're shown as a rank.
+        // Real descriptions top out at 0.29+; gibberish and non-fantasy subjects stay under ~0.26.
+        const WEAK_TEXT_MATCH = 0.27;
+
         let activeSearch = null;
 
         function showResultsMessage(text) {
@@ -1214,36 +1270,31 @@
             resultsContainer.appendChild(msg);
         }
 
-        // -- IMAGE SEARCH FUNCTION --
-        async function handleImageUpload(file) {
-            if (!file) return;
+        function tileButton(text, className, onClick) {
+            const btn = document.createElement('button');
+            btn.type = 'button'; btn.className = className; btn.textContent = text;
+            btn.addEventListener('click', e => { e.stopPropagation(); onClick(); });
+            return btn;
+        }
 
+        // -- SHARED SEARCH: ask our backend for matches, look them up on Scryfall, render tiles --
+        async function runSearch({ request, url, heading, labelFor }) {
             activeSearch?.abort();
             const search = activeSearch = new AbortController();
 
             const shouldFilter = document.getElementById('filterCommander').checked;
             const maxResults = parseInt(document.getElementById('maxResults').value, 10);
-            const currentLeniency = document.getElementById('leniencySlider').value;
 
-            preview.src = URL.createObjectURL(file);
-            preview.style.display = 'inline-block';
             resultsContainer.innerHTML = '';
             loading.style.display = 'block';
-
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('leniency', currentLeniency);
+            history.replaceState(null, '', url);  // every search gets a shareable address
 
             try {
-                const response = await fetch(`${API_BASE}/search`, {
-                    method: 'POST',
-                    body: formData,
-                    signal: search.signal
-                });
+                const response = await request(search.signal);
 
                 if (!response.ok) {
                     const detail = await response.json().then(d => d.detail, () => null);
-                    showResultsMessage(BACKEND_ERRORS[response.status] || (response.status === 400 && detail) || "Search failed. Please try again in a moment.");
+                    showResultsMessage(BACKEND_ERRORS[response.status] || ([400, 404].includes(response.status) && detail) || "Search failed. Please try again in a moment.");
                     return;
                 }
                 const data = await response.json();
@@ -1266,7 +1317,15 @@
                 const scryfallDict = {};
                 (await scryfallRes.json()).data.forEach(card => { scryfallDict[card.id] = card; });
 
-                const exactMatch = isExactArt(data.matches) ? data.matches[0] : null;
+                const headingText = heading?.(data);
+                if (headingText) {
+                    const h = document.createElement('p');
+                    h.className = 'results-heading';
+                    h.textContent = headingText;
+                    resultsContainer.appendChild(h);
+                }
+
+                const label = labelFor(data);
                 let displayedCount = 0;
                 for (const match of data.matches) {
                     if (displayedCount >= maxResults) break;
@@ -1288,8 +1347,8 @@
                     if (!imageUrl) continue;
 
                     const cardDiv = document.createElement('div'); cardDiv.className = 'card';
-                    const imgElement = document.createElement('img'); imgElement.src = imageUrl;
-                    imgElement.scryfallData = scryfallData; imgElement.faceIndex = faceIndex; imgElement.matchName = match.name; imgElement.matchScore = describeScore(match.similarity_score, match === exactMatch);
+                    const imgElement = document.createElement('img'); imgElement.src = imageUrl; imgElement.alt = match.name; imgElement.loading = 'lazy';
+                    imgElement.scryfallData = scryfallData; imgElement.faceIndex = faceIndex; imgElement.matchName = match.name; imgElement.matchScore = label(match, displayedCount);  // position among shown tiles, after filters
                     imgElement.addEventListener('click', activateZoomOverlay);
 
                     const contentWrapper = document.createElement('div'); contentWrapper.style = "padding:12px; display:flex; flex-direction:column; flex-grow:1;";
@@ -1302,10 +1361,9 @@
                     }
                     contentWrapper.appendChild(scoreElement);
 
-                    const rawTcgUrl = scryfallData.purchase_uris ? scryfallData.purchase_uris.tcgplayer : null;
-                    if (rawTcgUrl) {
-                        const buyBtn = document.createElement('a'); buyBtn.className = 'buy-btn'; buyBtn.textContent = 'Buy on TCGplayer'; buyBtn.target = '_blank';
-                        buyBtn.href = cleanAndWrapTcgUrl(rawTcgUrl); buyBtn.addEventListener('click', e => e.stopPropagation()); contentWrapper.appendChild(buyBtn);
+                    if (match.illustration_id) {
+                        contentWrapper.appendChild(tileButton('More like this', 'buy-btn alt-btn', () => showSimilar(match.illustration_id)));
+                        contentWrapper.appendChild(tileButton('Printings & prices', 'buy-btn', () => showPrintings(match.illustration_id, match.name)));
                     }
                     cardDiv.appendChild(contentWrapper); resultsContainer.appendChild(cardDiv);
                     displayedCount++;
@@ -1319,6 +1377,7 @@
                     endMsg.textContent = "End of high-confidence matches. Loosen the Leniency slider to see more!";
                     resultsContainer.appendChild(endMsg);
                 }
+                resultsHeading.scrollIntoView({ block: 'start' });
 
             } catch (error) {
                 if (error.name === 'AbortError') return;  // superseded by a newer search
@@ -1328,6 +1387,119 @@
                 if (activeSearch === search) loading.style.display = 'none';
             }
         }
+
+        // -- 1. IMAGE SEARCH --
+        function handleImageUpload(file) {
+            if (!file) return;
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'inline-block';
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('leniency', document.getElementById('leniencySlider').value);
+
+            return runSearch({
+                request: signal => fetch(`${API_BASE}/search`, { method: 'POST', body: formData, signal }),
+                url: location.pathname,  // an uploaded image can't live in a link
+                labelFor: data => {
+                    const exactMatch = isExactArt(data.matches) ? data.matches[0] : null;
+                    return match => describeScore(match.similarity_score, match === exactMatch);
+                },
+            });
+        }
+
+        // -- 2. TEXT SEARCH --
+        function searchByText(query) {
+            query = query.trim();
+            if (!query) return;
+            textQuery.value = query;
+            preview.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('query', query);
+
+            return runSearch({
+                request: signal => fetch(`${API_BASE}/search/text`, { method: 'POST', body: formData, signal }),
+                url: `?q=${encodeURIComponent(query)}`,
+                heading: data => data.matches[0].similarity_score < WEAK_TEXT_MATCH
+                    ? `No strong matches for “${query}”. Try describing what's in the picture, like creatures, places, or colours.`
+                    : `Art matching “${query}”`,
+                labelFor: () => (match, position) => `Match #${position + 1}`,
+            });
+        }
+
+        textSearchForm.addEventListener('submit', e => {
+            e.preventDefault();
+            searchByText(textQuery.value);
+        });
+
+        // -- MORE LIKE THIS: search from a card's stored vector, no upload needed --
+        function showSimilar(illustrationId) {
+            preview.style.display = 'none';
+            const leniency = document.getElementById('leniencySlider').value;
+            const params = new URLSearchParams({ illustration_id: illustrationId, leniency });
+
+            return runSearch({
+                request: signal => fetch(`${API_BASE}/similar?${params}`, { signal }),
+                url: `?similar=${encodeURIComponent(illustrationId)}`,
+                heading: data => `Art similar to ${data.source.name}`,
+                labelFor: () => match => describeScore(match.similarity_score, false),
+            });
+        }
+
+        // -- PRINTINGS & PRICES: every paper printing that uses this exact art, cheapest first --
+        const printingsModal = document.getElementById('printingsModal');
+        const printingsList = document.getElementById('printingsList');
+        const printingsTitle = document.getElementById('printingsTitle');
+
+        function formatUsd(value) { return value ? `$${value}` : '—'; }
+
+        async function showPrintings(illustrationId, name) {
+            printingsTitle.textContent = `💰 ${name}`;
+            printingsList.innerHTML = '<p class="printings-note">Loading printings…</p>';
+            printingsModal.style.display = 'block';
+
+            const scryfallQuery = `illustrationid:${illustrationId} -is:digital`;
+            const searchUrl = `https://scryfall.com/search?${new URLSearchParams({ q: scryfallQuery, unique: 'prints', order: 'usd' })}`;
+            try {
+                const res = await fetch(`https://api.scryfall.com/cards/search?${new URLSearchParams({ q: scryfallQuery, unique: 'prints', order: 'usd', dir: 'asc' })}`);
+                if (res.status === 404) { printingsList.innerHTML = '<p class="printings-note">No paper printings of this art.</p>'; return; }
+                if (!res.ok) throw new Error(`Scryfall search failed (${res.status})`);
+                const data = await res.json();
+
+                printingsList.innerHTML = '';
+                for (const card of data.data) {
+                    const row = document.createElement('div'); row.className = 'printing-row';
+                    const info = document.createElement('div'); info.className = 'printing-info';
+                    const setName = document.createElement('strong'); setName.textContent = card.set_name;
+                    const details = document.createElement('span');
+                    details.textContent = `${card.set.toUpperCase()} #${card.collector_number} · ${card.released_at.slice(0, 4)}`;
+                    info.append(setName, details);
+
+                    const prices = document.createElement('div'); prices.className = 'printing-prices';
+                    prices.textContent = `${formatUsd(card.prices.usd)} · foil ${formatUsd(card.prices.usd_foil || card.prices.usd_etched)}`;
+
+                    row.append(info, prices);
+                    const tcgUrl = card.purchase_uris?.tcgplayer;
+                    if (tcgUrl) {
+                        const buy = document.createElement('a'); buy.className = 'buy-btn printing-buy'; buy.textContent = 'Buy';
+                        buy.href = cleanAndWrapTcgUrl(tcgUrl); buy.target = '_blank'; buy.rel = 'noopener';
+                        row.appendChild(buy);
+                    }
+                    printingsList.appendChild(row);
+                }
+
+                const more = document.createElement('a');
+                more.className = 'printings-note'; more.href = searchUrl; more.target = '_blank'; more.rel = 'noopener';
+                more.textContent = data.has_more ? `See all ${data.total_cards} printings on Scryfall ↗` : 'View on Scryfall ↗';
+                printingsList.appendChild(more);
+            } catch (error) {
+                printingsList.innerHTML = '<p class="printings-note">Couldn\'t load printings from Scryfall. Please try again.</p>';
+                console.error(error);
+            }
+        }
+
+        function closePrintings() { printingsModal.style.display = 'none'; }
 
         // -- ZOOM OVERLAY & INSPECTOR LOGIC --
         function activateZoomOverlay(e) {
@@ -1361,6 +1533,7 @@
 
         document.addEventListener('keydown', (e) => {
             if (e.key === "Escape" && zoomOverlay.classList.contains('active')) closeZoomOverlay();
+            if (e.key === "Escape") closePrintings();
         });
 
         // -- FLIP BACK FACE LOGIC --
@@ -1418,6 +1591,10 @@
             currentAd = (currentAd + 1) % adImages.length;
             adElement.src = adImages[currentAd];
         }, 4500);
+        // Open a shared link: ?q=<description> or ?similar=<illustration id>
+        const startParams = new URLSearchParams(location.search);
+        if (startParams.get('q')) searchByText(startParams.get('q'));
+        else if (startParams.get('similar')) showSimilar(startParams.get('similar'));
     </script>
 </body>
 </html>

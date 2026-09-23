@@ -5,11 +5,11 @@ import threading
 import warnings
 from collections import defaultdict, deque
 from pathlib import Path
-from typing import Any, Dict, Deque, List
+from typing import Any, Dict, Deque, List, Optional
 
 import faiss
 import numpy as np
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image
@@ -26,6 +26,8 @@ ALLOWED_ORIGINS = [origin.strip() for origin in os.getenv(
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "30"))
 RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+MAX_QUERY_CHARS = 200
+RESULT_COUNT = 30
 
 # A small file can declare a huge canvas (decompression bomb). Reject past 120 MP, which
 # still admits 108 MP phone photos; PIL's default only errors at twice its warning limit.
@@ -37,6 +39,7 @@ search_slots = threading.BoundedSemaphore(4)
 index: faiss.Index = None  # type: ignore[assignment]
 model: SentenceTransformer = None  # type: ignore[assignment]
 id_mapping: List[Dict[str, Any]] = []
+illustration_rows: Dict[str, int] = {}
 
 rate_limit_store: Dict[str, Deque[float]] = defaultdict(deque)
 rate_limit_lock = asyncio.Lock()
@@ -67,7 +70,7 @@ def load_index(path: Path) -> faiss.Index:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global index, model, id_mapping
+    global index, model, id_mapping, illustration_rows
 
     print("Loading database and model into memory...")
 
@@ -80,6 +83,8 @@ async def lifespan(app: FastAPI):
     index = load_index(INDEX_PATH)
     if index.ntotal != len(id_mapping):
         raise RuntimeError(f"Index has {index.ntotal} vectors but mapping has {len(id_mapping)} entries.")
+    illustration_rows = {entry["illustration_id"]: row for row, entry in enumerate(id_mapping)
+                         if entry.get("illustration_id")}
     model = SentenceTransformer(MODEL_NAME)
 
     print(f"Backend ready! Loaded {index.ntotal} cards into memory.")
@@ -154,28 +159,28 @@ def _search(contents: bytes, leniency: float) -> List[Dict[str, Any]]:
     if CARD_ASPECT_RANGE[0] <= img.width / img.height <= CARD_ASPECT_RANGE[1]:
         queries.append(crop_art_box(img))
 
-    embedding_matrix = np.asarray(model.encode(queries, convert_to_numpy=True), dtype="float32")
-    faiss.normalize_L2(embedding_matrix)
+    return _nearest(model.encode(queries, convert_to_numpy=True), leniency)
 
-    k = min(30, int(index.ntotal))
-    if k <= 0:
-        raise HTTPException(status_code=500, detail="Search index contains no vectors.")
 
-    distances, indices = index.search(embedding_matrix, k)
+def _nearest(vectors: Any, leniency: Optional[float], exclude_row: Optional[int] = None) -> List[Dict[str, Any]]:
+    """Top matches for one or more query vectors; each card keeps its best score."""
+    matrix = np.asarray(vectors, dtype="float32").reshape(-1, index.d)
+    faiss.normalize_L2(matrix)
+    distances, rows = index.search(matrix, RESULT_COUNT + 1)
 
     best: Dict[int, float] = {}
-    for score, idx in zip(distances.ravel(), indices.ravel()):
-        if 0 <= idx < len(id_mapping):
-            best[int(idx)] = max(best.get(int(idx), -1.0), float(score))
+    for score, row in zip(distances.ravel(), rows.ravel()):
+        if 0 <= row < len(id_mapping) and row != exclude_row:
+            best[int(row)] = max(best.get(int(row), -1.0), float(score))
 
     results: List[Dict[str, Any]] = []
-    for idx, score in sorted(best.items(), key=lambda item: item[1], reverse=True)[:k]:
+    for row, score in sorted(best.items(), key=lambda item: item[1], reverse=True)[:RESULT_COUNT]:
         # The Leniency Filter: IndexFlatIP scores are cosine similarity (higher = closer),
         # so compare cosine distance (0..2) against the slider.
-        if 1.0 - score > leniency:
+        if leniency is not None and 1.0 - score > leniency:
             continue
 
-        card_meta = id_mapping[idx]
+        card_meta = id_mapping[row]
         results.append(
             {
                 "scryfall_id": card_meta["scryfall_id"],
@@ -187,6 +192,30 @@ def _search(contents: bytes, leniency: float) -> List[Dict[str, Any]]:
         )
 
     return results
+
+
+# Text and image vectors share CLIP's space, but text scores sit on a compressed scale
+# (~0.23-0.34 for the whole top 30), so the image leniency slider doesn't apply here.
+@app.post("/search/text")
+def search_text(query: str = Form("")) -> Dict[str, List[Dict[str, Any]]]:
+    query = query.strip()
+    if not query or len(query) > MAX_QUERY_CHARS:
+        raise HTTPException(status_code=400, detail=f"Describe the art in 1 to {MAX_QUERY_CHARS} characters.")
+    with search_slots:
+        return {"matches": _nearest(model.encode([query], convert_to_numpy=True), leniency=None)}
+
+
+# Uses the stored vector, so there is no image to download or embed.
+@app.get("/similar")
+def similar_art(illustration_id: str = Query(...), leniency: float = Query(0.25)) -> Dict[str, Any]:
+    row = illustration_rows.get(illustration_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="That artwork isn't in the index.")
+    source = id_mapping[row]
+    return {
+        "source": {"scryfall_id": source["scryfall_id"], "name": source["name"], "illustration_id": illustration_id},
+        "matches": _nearest(index.reconstruct(row), leniency, exclude_row=row),
+    }
 
 
 @app.get("/health")

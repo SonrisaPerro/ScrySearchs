@@ -2,13 +2,15 @@
 
 Reverse image search for Magic: The Gathering card art, built with FastAPI, FAISS, and CLIP embeddings.
 
-Upload artwork, a screenshot of a card, a photo, or a sketch, and get the cards whose art looks closest.
+Upload artwork, a screenshot of a card, a photo, or a sketch, or just describe the art in words, and get the cards whose art looks closest. From any result you can browse art that looks like it, or see every printing of that art with prices.
 
 ## How it works
 
 - Every unique piece of card art on Scryfall is embedded with the `clip-ViT-B-32` model and stored in a FAISS inner-product index (`scryfall_index.faiss`), with `id_mapping.json` mapping each vector back to its card.
 - `POST /search` embeds the upload and returns the 30 nearest artworks. Card-shaped uploads are also searched as their art box, since the index only contains art crops.
-- The frontend (`index.html`) looks up each match on Scryfall's API for images, legality, and TCGplayer links.
+- `POST /search/text` embeds a description with CLIP's text encoder and searches the same index.
+- `GET /similar` searches from a card's stored vector, so "more like this" needs no upload.
+- The frontend (`index.html`) looks up each match on Scryfall's API for images and legality, and lists every printing of a matched art (Scryfall's `illustrationid:` search) with prices and TCGplayer links. Text and similar searches get shareable links (`?q=...`, `?similar=...`).
 
 ## Files
 
@@ -45,15 +47,25 @@ A local run only changes your local copy. To ship it, create a release with both
 
 `POST /search` takes a multipart form with `file` (an image, max 20 MB) and optional `leniency` (maximum cosine distance, default `0.25`).
 
+`POST /search/text` takes a form field `query` (1 to 200 characters). Leniency doesn't apply: text-to-image scores are compressed (about 0.23 to 0.34 for a whole top 30), so the page shows rank instead.
+
+`GET /similar?illustration_id=...&leniency=0.25` returns art similar to an indexed artwork (excluding itself), plus a `source` object naming it. Unknown ids return 404.
+
+All three return:
+
 ```json
 {
   "matches": [
-    {"scryfall_id": "...", "name": "...", "similarity_score": 0.9542, "api_link": "https://api.scryfall.com/cards/..."}
+    {"scryfall_id": "...", "name": "...", "illustration_id": "...", "similarity_score": 0.9542, "api_link": "https://api.scryfall.com/cards/..."}
   ]
 }
 ```
 
-`similarity_score` is cosine similarity: an exact art match scores above about 0.9, and photos and sketches usually land around 0.75 to 0.85.
+`similarity_score` is cosine similarity. Similar-looking card art alone scores 0.84 to 0.93, so the page only labels a result "Same art" when the top hit scores at least 0.86 and leads the next by at least 0.025.
+
+## Affiliate links
+
+Buy links use Scryfall's TCGplayer partner links by default (they land on the product page and credit Scryfall). To use your own TCGplayer affiliate account, set `IMPACT_AFFILIATE_REDIRECT` at the top of the script in `index.html` to your deep-link prefix ending in `?u=`.
 
 ## Deployment
 
