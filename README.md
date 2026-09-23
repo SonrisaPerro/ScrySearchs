@@ -73,9 +73,9 @@ All three give back:
 
 `similarity_score` is cosine similarity. Heads up: card art that's merely similar still scores 0.84 to 0.93, so a high number alone doesn't mean you found the card. The page only says "Same art" when the top result scores at least 0.86 *and* beats second place by at least 0.025.
 
-## Affiliate links
+## Buy links
 
-Buy links go through Scryfall's TCGplayer partner links by default. They land on the right product page and send the credit to Scryfall, which feels fair since this whole thing runs on their data. To use your own TCGplayer affiliate account instead, set `IMPACT_AFFILIATE_REDIRECT` at the top of the script in `index.html` to your deep-link prefix (it ends in `?u=`).
+Buy links go through Scryfall's TCGplayer partner links. They land on the right product page and send the credit to Scryfall, which feels fair since this whole thing runs on their data.
 
 ## Deployment
 

@@ -1061,11 +1061,7 @@
     </footer>
 
    <script>
-        // 🚨 CONFIGURATION FOR AFFILIATE LINKING
-        // Your TCGplayer (Impact) deep-link prefix, ending in "?u=", e.g.
-        // "https://partner.tcgplayer.com/c/<your id>/1830156/21018?u=". Left empty, buy links use
-        // Scryfall's own partner link, which lands on the product page and credits Scryfall.
-        const IMPACT_AFFILIATE_REDIRECT = ""; 
+        const LINK_BASE = "";
 
         // GitHub Pages copy has no backend; everywhere else the page is served by main.py itself.
         const API_BASE = location.hostname.endsWith('github.io') ? 'https://scryfallsearch.up.railway.app' : '';
@@ -1208,14 +1204,14 @@
 
         controlsContainer.addEventListener('click', e => e.stopPropagation());
 
-        // Scryfall's TCGplayer links are partner redirects that carry the product page in ?u=.
-        // (Stripping the whole query, as this used to, sent every buyer to the TCGplayer homepage.)
-        function cleanAndWrapTcgUrl(rawScryfallTcgUrl) {
-            if (!rawScryfallTcgUrl) return "#";
-            if (!IMPACT_AFFILIATE_REDIRECT) return rawScryfallTcgUrl;
+        // Scryfall's TCGplayer links carry the product page in ?u=; keep it (dropping the query
+        // sent buyers to the TCGplayer homepage).
+        function buyLink(url) {
+            if (!url) return "#";
+            if (!LINK_BASE) return url;
 
-            const productUrl = new URL(rawScryfallTcgUrl).searchParams.get('u') || rawScryfallTcgUrl;
-            return `${IMPACT_AFFILIATE_REDIRECT}${encodeURIComponent(productUrl.split('?')[0])}`;
+            const productUrl = new URL(url).searchParams.get('u') || url;
+            return `${LINK_BASE}${encodeURIComponent(productUrl.split('?')[0])}`;
         }
 
         // -- DRAG & DROP LOGIC --
@@ -1532,7 +1528,7 @@
                     const tcgUrl = card.purchase_uris?.tcgplayer;
                     if (tcgUrl) {
                         const buy = document.createElement('a'); buy.className = 'buy-btn printing-buy'; buy.textContent = 'Buy';
-                        buy.href = cleanAndWrapTcgUrl(tcgUrl); buy.target = '_blank'; buy.rel = 'noopener';
+                        buy.href = buyLink(tcgUrl); buy.target = '_blank'; buy.rel = 'noopener';
                         row.appendChild(buy);
                     }
                     printingsList.appendChild(row);
