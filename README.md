@@ -7,6 +7,7 @@ Reverse image search for Magic card art. Give it a picture and it finds the card
 ## What it does
 
 - **Search with an image.** Artwork, a screenshot of a card, a photo, a sketch. Screenshots of whole cards get the art cropped out automatically, since that's the only part the index knows about.
+- **Crop before searching.** Photo of a card sitting on a table? Box just the artwork and search again. Makes a big difference for phone pictures.
 - **Search by description.** Type something like "a goblin riding a bomb" and it'll find art that fits.
 - **More like this.** Every result has a button to go find art that looks like *that* card.
 - **Printings & prices.** See every paper printing that uses the same art, cheapest first, with a link to buy it.

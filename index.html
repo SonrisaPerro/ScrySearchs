@@ -649,6 +649,24 @@
         .printings-source img { width: 96px; height: auto; border: 2px solid var(--accent-orange); }
         .printings-source:empty { display: none; }
 
+        /* Optional crop before searching */
+        .crop-btn { margin-top: 10px; }
+        .crop-modal { width: 640px; max-width: 94vw; max-height: 94vh; }
+        .crop-hint { margin: 4px 4px 10px; font-size: 0.85rem; text-align: center; }
+        .crop-stage {
+            position: relative; display: inline-block; max-width: 100%; line-height: 0;
+            cursor: crosshair; touch-action: none; user-select: none; border: 2px solid var(--accent-blue);
+        }
+        .crop-stage img { max-width: 100%; max-height: 60vh; display: block; }
+        .crop-box {
+            position: absolute; border: 2px dashed var(--accent-orange);
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);  /* dims everything outside the box */
+            pointer-events: none;
+        }
+        .crop-modal .achievement-list { text-align: center; }
+        .crop-actions { display: flex; gap: 10px; justify-content: center; align-items: center; margin-top: 12px; line-height: normal; }
+        .crop-actions .upload-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
         .toast-container {
             position: fixed; bottom: 20px; right: 20px; z-index: 4000;
             display: flex; flex-direction: column; gap: 10px; pointer-events: none;
@@ -957,6 +975,24 @@
         <div class="achievement-list" id="achievementListUI"></div>
     </div>
 
+    <div id="cropModal" class="achievements-modal crop-modal" role="dialog" aria-label="Crop your image">
+        <div class="achievements-header">
+            <span>&#9986; Crop your image</span>
+            <button onclick="closeCrop()" style="cursor:pointer; background:#c0c0c0; border:2px solid; border-color:#fff #808080 #808080 #fff; font-weight:bold; color:#000;">X</button>
+        </div>
+        <div class="achievement-list">
+            <p class="crop-hint">Drag a box around <strong>just the artwork</strong>. Leave out the card's name and text box, and anything behind the card.</p>
+            <div class="crop-stage" id="cropStage">
+                <img id="cropImage" alt="Your image" draggable="false">
+                <div class="crop-box" id="cropBox" hidden></div>
+            </div>
+            <div class="crop-actions">
+                <button type="button" class="upload-btn" id="cropSearchBtn" disabled>Search this area</button>
+                <button type="button" class="preset-btn" onclick="closeCrop()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div id="printingsModal" class="achievements-modal printings-modal">
         <div class="achievements-header">
             <span id="printingsTitle">💰 Printings</span>
@@ -1022,6 +1058,8 @@
 
         <br>
         <img id="preview" alt="Image preview">
+        <br>
+        <button type="button" id="cropBtn" class="preset-btn crop-btn" hidden>&#9986; Crop &amp; search again</button>
     </div>
 
     <div class="upload-container text-search-box">
@@ -1321,7 +1359,7 @@
 
         // Clicking anywhere in the upload box opens the picker (the label and input already do on their own).
         dropZone.addEventListener('click', e => {
-            if (!e.target.closest('label, input')) imageUpload.click();
+            if (!e.target.closest('label, input, button')) imageUpload.click();
         });
 
         const BACKEND_ERRORS = {
@@ -1548,11 +1586,15 @@
         }
 
         // -- 1. IMAGE SEARCH --
-        function handleImageUpload(file) {
+        let originalUpload = null;  // the image as chosen, so every crop starts from the full picture
+
+        function handleImageUpload(file, { cropped = false } = {}) {
             if (!file) return;
+            if (!cropped) originalUpload = file;
             if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);  // free the last upload
             preview.src = URL.createObjectURL(file);
             preview.style.display = 'inline-block';
+            cropBtn.hidden = false;
 
             const leniency = document.getElementById('leniencySlider').value;
 
@@ -1564,7 +1606,7 @@
                     return fetch(withFilters(`${API_BASE}/search`), { method: 'POST', body: formData, signal });
                 },
                 url: withFilters(location.pathname),  // an uploaded image can't live in a link, but its filters can
-                rerun: () => handleImageUpload(file),
+                rerun: () => handleImageUpload(file, { cropped }),
                 labelFor: data => {
                     const exactMatch = isExactArt(data.matches) ? data.matches[0] : null;
                     return match => describeScore(match.similarity_score, match === exactMatch);
@@ -1572,12 +1614,74 @@
             });
         }
 
+        // -- CROP BEFORE SEARCH: box part of the image and search just that --
+        const cropBtn = document.getElementById('cropBtn');
+        const cropModal = document.getElementById('cropModal');
+        const cropStage = document.getElementById('cropStage');
+        const cropImage = document.getElementById('cropImage');
+        const cropBox = document.getElementById('cropBox');
+        const cropSearchBtn = document.getElementById('cropSearchBtn');
+        let cropRect = null;  // in on-screen pixels of cropImage
+        let dragStart = null;
+
+        function openCrop() {
+            if (!originalUpload) return;
+            if (cropImage.src.startsWith('blob:')) URL.revokeObjectURL(cropImage.src);
+            cropImage.src = URL.createObjectURL(originalUpload);
+            cropRect = null; cropBox.hidden = true; cropSearchBtn.disabled = true;
+            cropModal.style.display = 'block';
+        }
+
+        function closeCrop() { cropModal.style.display = 'none'; }
+
+        function stagePoint(e) {
+            const r = cropImage.getBoundingClientRect();
+            return { x: Math.min(Math.max(e.clientX - r.left, 0), r.width), y: Math.min(Math.max(e.clientY - r.top, 0), r.height) };
+        }
+
+        function drawCropBox() {
+            Object.assign(cropBox.style, { left: `${cropRect.x}px`, top: `${cropRect.y}px`, width: `${cropRect.w}px`, height: `${cropRect.h}px` });
+            cropBox.hidden = false;
+        }
+
+        cropStage.addEventListener('pointerdown', e => {
+            dragStart = stagePoint(e);
+            cropStage.setPointerCapture(e.pointerId);
+            e.preventDefault();
+        });
+        cropStage.addEventListener('pointermove', e => {
+            if (!dragStart) return;
+            const p = stagePoint(e);
+            cropRect = { x: Math.min(p.x, dragStart.x), y: Math.min(p.y, dragStart.y), w: Math.abs(p.x - dragStart.x), h: Math.abs(p.y - dragStart.y) };
+            drawCropBox();
+        });
+        cropStage.addEventListener('pointerup', () => {
+            dragStart = null;
+            cropSearchBtn.disabled = !(cropRect && cropRect.w >= 12 && cropRect.h >= 12);  // ignore stray clicks
+        });
+
+        cropBtn.addEventListener('click', e => { e.stopPropagation(); openCrop(); });
+
+        cropSearchBtn.addEventListener('click', async () => {
+            // Map the on-screen box back onto the full-resolution image (rotation already applied).
+            const bitmap = await createImageBitmap(originalUpload, { imageOrientation: 'from-image' });
+            const scale = bitmap.width / cropImage.getBoundingClientRect().width;
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(cropRect.w * scale);
+            canvas.height = Math.round(cropRect.h * scale);
+            canvas.getContext('2d').drawImage(bitmap, cropRect.x * scale, cropRect.y * scale, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+            closeCrop();
+            handleImageUpload(new File([blob], 'cropped.jpg', { type: 'image/jpeg' }), { cropped: true });
+        });
+
         // -- 2. TEXT SEARCH --
         function searchByText(query) {
             query = query.trim();
             if (!query) return;
             textQuery.value = query;
             preview.style.display = 'none';
+            cropBtn.hidden = true;
 
             const formData = new FormData();
             formData.append('query', query);
@@ -1601,6 +1705,7 @@
         // -- MORE LIKE THIS: search from a card's stored vector, no upload needed --
         function showSimilar(illustrationId) {
             preview.style.display = 'none';
+            cropBtn.hidden = true;
             const leniency = document.getElementById('leniencySlider').value;
             return runSearch({
                 request: signal => fetch(withFilters(`${API_BASE}/similar`, { illustration_id: illustrationId, leniency }), { signal }),
@@ -1730,7 +1835,7 @@
 
         document.addEventListener('keydown', (e) => {
             if (e.key === "Escape" && zoomOverlay.classList.contains('active')) closeZoomOverlay();
-            if (e.key === "Escape") closePrintings();
+            if (e.key === "Escape") { closePrintings(); closeCrop(); }
         });
 
         // -- FLIP BACK FACE LOGIC --
