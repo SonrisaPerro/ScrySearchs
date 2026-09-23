@@ -10,12 +10,13 @@ Reverse image search for Magic card art. Give it a picture and it finds the card
 - **Search by description.** Type something like "a goblin riding a bomb" and it'll find art that fits.
 - **More like this.** Every result has a button to go find art that looks like *that* card.
 - **Printings & prices.** See every paper printing that uses the same art, cheapest first, with a link to buy it.
+- **Filters.** Colours (what fits your deck, Commander-style), card type, format, and hiding tokens and other oddities. They work on every kind of search.
 
 Text and "more like this" searches get their own link, so you can send someone exactly what you found.
 
 ## How it works
 
-Every unique piece of card art on Scryfall gets run through a CLIP model (`clip-ViT-B-32`), which turns each image into a list of numbers describing what it looks like. Those all live in a FAISS index, and a search is just "which of these ~55,000 are closest to yours?"
+Every unique piece of card art on Scryfall gets run through a CLIP model (`clip-ViT-B-32`), which turns each image into a list of numbers describing what it looks like. Those all live in a FAISS index, and a search is just "which of these ~53,000 are closest to yours?"
 
 - `POST /search` embeds your upload and returns the 30 closest artworks. Card-shaped uploads also get searched as just their art box.
 - `POST /search/text` does the same with your description, using CLIP's text side. Text and images land in the same space, which is why this works at all.
@@ -60,6 +61,15 @@ A local run only updates your copy. To ship it, make a release with both files a
 `POST /search/text`: form field `query`, 1 to 200 characters. Leniency doesn't apply here. Text scores are all bunched together (roughly 0.23 to 0.34 across the whole top 30), so the page just shows rank.
 
 `GET /similar?illustration_id=...&leniency=0.25`: art similar to a card already in the index, not counting itself, plus a `source` object saying which card that was. Unknown ids get a 404.
+
+All three also take these optional filters as query parameters:
+
+- `colors`: colour identity that has to fit inside these, like `UR`. `C` on its own means colourless only.
+- `types`: comma-separated, any of `creature`, `land`, `instant` (covers sorceries too), `artifact`, `enchantment`, `planeswalker`, `battle`.
+- `format`: legal in one of `commander`, `standard`, `pioneer`, `modern`, `legacy`, `vintage`, `pauper`.
+- `hide_oddities=true`: no tokens, emblems, planes, schemes or vanguards.
+
+Filtering happens inside the search, so you get the best 30 matches among cards that pass, not whatever's left of an unfiltered 30. Bad values get a 400.
 
 All three give back:
 

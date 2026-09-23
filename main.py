@@ -9,7 +9,7 @@ from typing import Any, Dict, Deque, List, Optional
 
 import faiss
 import numpy as np
-from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image
@@ -17,7 +17,8 @@ from sentence_transformers import SentenceTransformer
 from contextlib import asynccontextmanager
 from io import BytesIO
 
-from assets import INDEX_PATH, MAPPING_PATH, MODEL_NAME, ROOT_DIR, ensure_assets
+from assets import (COLOR_BITS, FORMATS, INDEX_PATH, MAPPING_PATH, MODEL_NAME, ROOT_DIR, TYPE_BITS,
+                    ensure_assets)
 
 ALLOWED_ORIGINS = [origin.strip() for origin in os.getenv(
     "ALLOWED_ORIGINS",
@@ -40,6 +41,8 @@ index: faiss.Index = None  # type: ignore[assignment]
 model: SentenceTransformer = None  # type: ignore[assignment]
 id_mapping: List[Dict[str, Any]] = []
 illustration_rows: Dict[str, int] = {}
+# Per-row filter bitmasks from the mapping (see assets.py): colour identity, types, legal formats, oddity.
+card_colors = card_types = card_formats = card_odd = np.zeros(0, dtype=np.uint8)
 
 rate_limit_store: Dict[str, Deque[float]] = defaultdict(deque)
 rate_limit_lock = asyncio.Lock()
@@ -70,7 +73,7 @@ def load_index(path: Path) -> faiss.Index:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global index, model, id_mapping, illustration_rows
+    global index, model, id_mapping, illustration_rows, card_colors, card_types, card_formats, card_odd
 
     print("Loading database and model into memory...")
 
@@ -85,6 +88,8 @@ async def lifespan(app: FastAPI):
         raise RuntimeError(f"Index has {index.ntotal} vectors but mapping has {len(id_mapping)} entries.")
     illustration_rows = {entry["illustration_id"]: row for row, entry in enumerate(id_mapping)
                          if entry.get("illustration_id")}
+    card_colors, card_types, card_formats, card_odd = (
+        np.array([entry.get(key, 0) for entry in id_mapping], dtype=np.uint8) for key in ("ci", "t", "f", "odd"))
     model = SentenceTransformer(MODEL_NAME)
 
     print(f"Backend ready! Loaded {index.ntotal} cards into memory.")
@@ -125,11 +130,41 @@ async def simple_rate_limiter(request: Request, call_next):
     return await call_next(request)
 
 
+def card_filter(
+    colors: str = Query("", description="'Fits my deck' colour identity, e.g. UR; C alone = colourless only"),
+    types: str = Query("", description="Comma-separated: creature,land,instant,artifact,enchantment,planeswalker,battle"),
+    format: str = Query("", description="Legal in this format: " + ", ".join(FORMATS)),
+    hide_oddities: bool = Query(False, description="Hide tokens, emblems, planes, schemes and vanguards"),
+) -> Optional[np.ndarray]:
+    """Which index rows a search may return, or None when nothing is filtered."""
+    colors = colors.upper()
+    type_names = [t for t in types.lower().split(",") if t]
+    if set(colors) - set("WUBRGC") or any(t not in TYPE_BITS for t in type_names) or (format and format not in FORMATS):
+        raise HTTPException(status_code=400, detail="Unknown filter value.")
+    if not (colors or type_names or format or hide_oddities):
+        return None
+
+    allowed = np.ones(len(id_mapping), dtype=bool)
+    if colors == "C":
+        allowed &= card_colors == 0
+    elif colors:
+        picked = sum(COLOR_BITS[c] for c in colors if c in COLOR_BITS)
+        allowed &= (card_colors & ~np.uint8(picked)) == 0  # identity fits inside the picked colours
+    if type_names:
+        allowed &= (card_types & np.uint8(sum({TYPE_BITS[t] for t in type_names}))) != 0
+    if format:
+        allowed &= (card_formats & np.uint8(1 << FORMATS.index(format))) != 0
+    if hide_oddities:
+        allowed &= card_odd == 0
+    return allowed
+
+
 # Plain def: FastAPI runs it in a worker thread, so CLIP inference doesn't block other requests.
 @app.post("/search")
 def search_image(
     file: UploadFile = File(...),
-    leniency: float = Form(0.25)
+    leniency: float = Form(0.25),
+    allowed: Optional[np.ndarray] = Depends(card_filter),
 ) -> Dict[str, List[Dict[str, Any]]]:
     
     if not file.content_type or not file.content_type.startswith("image/"):
@@ -140,10 +175,10 @@ def search_image(
         raise HTTPException(status_code=413, detail="Image is too large (max 20 MB).")
 
     with search_slots:
-        return {"matches": _search(contents, leniency)}
+        return {"matches": _search(contents, leniency, allowed)}
 
 
-def _search(contents: bytes, leniency: float) -> List[Dict[str, Any]]:
+def _search(contents: bytes, leniency: float, allowed: Optional[np.ndarray]) -> List[Dict[str, Any]]:
     try:
         img = Image.open(BytesIO(contents))
         img.draft("RGB", (1024, 1024))  # JPEG decodes at reduced scale; no-op for other formats
@@ -159,14 +194,22 @@ def _search(contents: bytes, leniency: float) -> List[Dict[str, Any]]:
     if CARD_ASPECT_RANGE[0] <= img.width / img.height <= CARD_ASPECT_RANGE[1]:
         queries.append(crop_art_box(img))
 
-    return _nearest(model.encode(queries, convert_to_numpy=True), leniency)
+    return _nearest(model.encode(queries, convert_to_numpy=True), leniency, allowed=allowed)
 
 
-def _nearest(vectors: Any, leniency: Optional[float], exclude_row: Optional[int] = None) -> List[Dict[str, Any]]:
+def _nearest(vectors: Any, leniency: Optional[float], exclude_row: Optional[int] = None,
+             allowed: Optional[np.ndarray] = None) -> List[Dict[str, Any]]:
     """Top matches for one or more query vectors; each card keeps its best score."""
     matrix = np.asarray(vectors, dtype="float32").reshape(-1, index.d)
     faiss.normalize_L2(matrix)
-    distances, rows = index.search(matrix, RESULT_COUNT + 1)
+    if allowed is None:
+        distances, rows = index.search(matrix, RESULT_COUNT + 1)
+    else:
+        # Search only the allowed rows, so filters return the true best matches among them
+        # instead of whatever survives from an unfiltered top 30.
+        bitmap = np.packbits(allowed, bitorder="little")  # must outlive the search call
+        selector = faiss.IDSelectorBitmap(len(allowed), faiss.swig_ptr(bitmap))
+        distances, rows = index.search(matrix, RESULT_COUNT + 1, params=faiss.SearchParameters(sel=selector))
 
     best: Dict[int, float] = {}
     for score, row in zip(distances.ravel(), rows.ravel()):
@@ -197,24 +240,25 @@ def _nearest(vectors: Any, leniency: Optional[float], exclude_row: Optional[int]
 # Text and image vectors share CLIP's space, but text scores sit on a compressed scale
 # (~0.23-0.34 for the whole top 30), so the image leniency slider doesn't apply here.
 @app.post("/search/text")
-def search_text(query: str = Form("")) -> Dict[str, List[Dict[str, Any]]]:
+def search_text(query: str = Form(""), allowed: Optional[np.ndarray] = Depends(card_filter)) -> Dict[str, List[Dict[str, Any]]]:
     query = query.strip()
     if not query or len(query) > MAX_QUERY_CHARS:
         raise HTTPException(status_code=400, detail=f"Describe the art in 1 to {MAX_QUERY_CHARS} characters.")
     with search_slots:
-        return {"matches": _nearest(model.encode([query], convert_to_numpy=True), leniency=None)}
+        return {"matches": _nearest(model.encode([query], convert_to_numpy=True), leniency=None, allowed=allowed)}
 
 
 # Uses the stored vector, so there is no image to download or embed.
 @app.get("/similar")
-def similar_art(illustration_id: str = Query(...), leniency: float = Query(0.25)) -> Dict[str, Any]:
+def similar_art(illustration_id: str = Query(...), leniency: float = Query(0.25),
+                allowed: Optional[np.ndarray] = Depends(card_filter)) -> Dict[str, Any]:
     row = illustration_rows.get(illustration_id)
     if row is None:
         raise HTTPException(status_code=404, detail="That artwork isn't in the index.")
     source = id_mapping[row]
     return {
         "source": {"scryfall_id": source["scryfall_id"], "name": source["name"], "illustration_id": illustration_id},
-        "matches": _nearest(index.reconstruct(row), leniency, exclude_row=row),
+        "matches": _nearest(index.reconstruct(row), leniency, exclude_row=row, allowed=allowed),
     }
 
 

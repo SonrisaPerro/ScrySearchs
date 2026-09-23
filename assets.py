@@ -16,6 +16,12 @@ MODEL_NAME = "clip-ViT-B-32"
 
 RELEASE_URL = "https://github.com/SonrisaPerro/ScrySearchs/releases/download/{tag}/{name}"
 
+# Filter metadata stored per artwork in the mapping as small bitmasks (base.py writes, main.py reads).
+COLOR_BITS = {"W": 1, "U": 2, "B": 4, "R": 8, "G": 16}
+TYPE_BITS = {"creature": 1, "land": 2, "instant": 4, "sorcery": 4, "artifact": 8, "enchantment": 16, "planeswalker": 32, "battle": 64}
+FORMATS = ["commander", "standard", "pioneer", "modern", "legacy", "vintage", "pauper"]
+ODD_LAYOUTS = {"token", "double_faced_token", "emblem", "planar", "vanguard", "scheme"}
+
 
 def ensure_assets() -> None:
     """Download the index and mapping from the pinned release if they aren't on disk."""
