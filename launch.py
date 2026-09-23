@@ -4,14 +4,16 @@ import subprocess
 import sys
 import time
 import webbrowser
+from pathlib import Path
 
 BACKEND_PORT = 8000
 BACKEND_HOST = "127.0.0.1"
+ROOT_DIR = Path(__file__).resolve().parent
 
 
 def launch_backend(port: int, host: str, env: dict) -> subprocess.Popen:
     command = [sys.executable, "-m", "uvicorn", "main:app", "--host", host, "--port", str(port)]
-    return subprocess.Popen(command, env=env)
+    return subprocess.Popen(command, env=env, cwd=ROOT_DIR)  # uvicorn imports main.py from here
 
 
 def wait_until_ready(url: str, timeout: float = 30.0):

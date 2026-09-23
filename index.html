@@ -1100,8 +1100,17 @@
             { id: "outcaster", icon: "🌠", title: "Outcaster Trailblazer", desc: "Drag an image over the Contact window. No meteor tokens generated.", type: "event", desktopOnly: true }
         ];
 
-        let scanCount = parseInt(localStorage.getItem('mtgScanCount') || '0');
-        let unlockedAch = JSON.parse(localStorage.getItem('mtgAchievements') || '[]');
+        // Browser storage can be blocked (privacy modes) or hold junk; neither should break the page.
+        function loadSaved(key, fallback) {
+            try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+        }
+        function save(key, value) {
+            try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* achievements just won't persist */ }
+        }
+
+        let scanCount = Number(loadSaved('mtgScanCount', 0)) || 0;
+        let unlockedAch = loadSaved('mtgAchievements', []);
+        if (!Array.isArray(unlockedAch)) unlockedAch = [];
         
         document.getElementById('scan-count-display').innerText = scanCount;
 
@@ -1122,14 +1131,14 @@
             if (ach.desktopOnly && !isDesktop()) return;
 
             unlockedAch.push(id);
-            localStorage.setItem('mtgAchievements', JSON.stringify(unlockedAch));
+            save('mtgAchievements', unlockedAch);
             showToast(ach.title, ach.icon);
             renderAchievements();
         }
 
         function trackScan() {
             scanCount++;
-            localStorage.setItem('mtgScanCount', scanCount);
+            save('mtgScanCount', scanCount);
             document.getElementById('scan-count-display').innerText = scanCount;
 
             ACHIEVEMENTS.filter(a => a.type === "scan").forEach(ach => {
@@ -1407,6 +1416,7 @@
         // -- 1. IMAGE SEARCH --
         function handleImageUpload(file) {
             if (!file) return;
+            if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);  // free the last upload
             preview.src = URL.createObjectURL(file);
             preview.style.display = 'inline-block';
 
