@@ -1005,7 +1005,7 @@
                 <button class="bg-window-close" onclick="this.closest('.bg-window').style.display='none'">X</button>
             </div>
             <div class="bg-window-content" style="padding: 0; margin: 4px;">
-                <img id="retroAd" src="https://media.giphy.com/media/13HgwGsXF0aiGY/giphy.gif" width="180" height="180" style="object-fit: cover;">
+                <img id="retroAd" src="https://media.giphy.com/media/13HgwGsXF0aiGY/200h.webp" width="180" height="180" style="object-fit: cover;">
             </div>
         </div>
     </div>
@@ -1425,7 +1425,14 @@
             history.replaceState(null, '', url);  // every search gets a shareable address
 
             try {
-                const response = await request(search.signal);
+                let response = await request(search.signal);
+                // The server sleeps when idle (Railway serverless) and can answer 502/503 while it boots.
+                for (let attempt = 1; [502, 503].includes(response.status) && attempt <= 5; attempt++) {
+                    showResultsMessage("Waking the server up, one moment...");
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    if (activeSearch !== search) return;  // a newer search took over while we waited
+                    response = await request(search.signal);
+                }
 
                 if (!response.ok) {
                     const detail = await response.json().then(d => d.detail, () => null);
@@ -1517,6 +1524,29 @@
             }
         }
 
+        // Phone photos are 3-12 MB, but the server only looks at ~1024 px (CLIP itself uses 224), so
+        // send a ~1600 px JPEG. Drawing through a canvas also applies the phone's rotation tag,
+        // so portrait photos arrive upright.
+        const UPLOAD_MAX_SIDE = 1600;
+        async function shrinkForUpload(file) {
+            if (file.size < 500_000) return file;
+            try {
+                const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+                const scale = Math.min(1, UPLOAD_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.round(bitmap.width * scale);
+                canvas.height = Math.round(bitmap.height * scale);
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#fff';  // transparent PNGs would otherwise turn black as JPEG
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+                return blob && blob.size < file.size ? new File([blob], 'upload.jpg', { type: 'image/jpeg' }) : file;
+            } catch {
+                return file;  // a format the browser can't draw; let the server try
+            }
+        }
+
         // -- 1. IMAGE SEARCH --
         function handleImageUpload(file) {
             if (!file) return;
@@ -1524,12 +1554,15 @@
             preview.src = URL.createObjectURL(file);
             preview.style.display = 'inline-block';
 
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('leniency', document.getElementById('leniencySlider').value);
+            const leniency = document.getElementById('leniencySlider').value;
 
             return runSearch({
-                request: signal => fetch(withFilters(`${API_BASE}/search`), { method: 'POST', body: formData, signal }),
+                request: async signal => {
+                    const formData = new FormData();
+                    formData.append('file', await shrinkForUpload(file));
+                    formData.append('leniency', leniency);
+                    return fetch(withFilters(`${API_BASE}/search`), { method: 'POST', body: formData, signal });
+                },
                 url: withFilters(location.pathname),  // an uploaded image can't live in a link, but its filters can
                 rerun: () => handleImageUpload(file),
                 labelFor: data => {
@@ -1745,9 +1778,9 @@
 
         const adElement = document.getElementById('retroAd');
         const adImages = [
-            "https://media.giphy.com/media/13HgwGsXF0aiGY/giphy.gif",
-            "https://media.giphy.com/media/26AHG5KGFxSkUWw1i/giphy.gif",
-            "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3RnZTl2aW9oM3VveXNldXV5NzE0ZWc4NnQ4ZHQwaHUxcW1zajlzNSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/L1R1tvI9svkIWwpVYr/giphy.gif"
+            "https://media.giphy.com/media/13HgwGsXF0aiGY/200h.webp",
+            "https://media.giphy.com/media/26AHG5KGFxSkUWw1i/200w.webp",
+            "https://media.giphy.com/media/L1R1tvI9svkIWwpVYr/200h.webp"
         ];
         let currentAd = 0;
 

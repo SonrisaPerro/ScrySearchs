@@ -12,7 +12,7 @@ import numpy as np
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from PIL import Image
+from PIL import Image, ImageOps
 from sentence_transformers import SentenceTransformer
 from contextlib import asynccontextmanager
 from io import BytesIO
@@ -182,7 +182,7 @@ def _search(contents: bytes, leniency: float, allowed: Optional[np.ndarray]) -> 
     try:
         img = Image.open(BytesIO(contents))
         img.draft("RGB", (1024, 1024))  # JPEG decodes at reduced scale; no-op for other formats
-        img = img.convert("RGB")
+        img = ImageOps.exif_transpose(img).convert("RGB")  # phones tag portrait shots instead of rotating them
     except (Image.DecompressionBombError, Image.DecompressionBombWarning):
         raise HTTPException(status_code=413, detail="Image dimensions are too large (max 120 megapixels).")
     except Exception:
