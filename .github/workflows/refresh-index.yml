@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 6 * * 1"  # Mondays 06:00 UTC
   workflow_dispatch:
+    inputs:
+      check_anyway:
+        description: Run the smoke checks even if nothing changed (publishing still needs a change)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -32,17 +37,33 @@ jobs:
       - name: Embed new artwork
         run: python base.py
 
-      - name: Publish a new release if anything changed
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Detect changes
+        id: diff
         run: |
           if cmp -s id_mapping.json "$RUNNER_TEMP/previous_mapping.json"; then
             echo "No new artwork on Scryfall."
-            exit 0
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
-          tag="index-$(date -u +%Y-%m-%d)"
+
+      # Serve the new index locally and run the smoke checks, so a broken index never ships.
+      - name: Check the new index
+        if: steps.diff.outputs.changed == 'true' || inputs.check_anyway
+        run: |
+          uvicorn main:app --port 8000 > server.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8000/health && break; sleep 5; done
+          python check.py http://127.0.0.1:8000 || { cat server.log; exit 1; }
+
+      - name: Publish the new release
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          stamp="$(date -u +%Y-%m-%d-%H%M)"  # the time too, so a same-day rerun gets its own release
+          tag="index-$stamp"
           gh release create "$tag" scryfall_index.faiss id_mapping.json \
-            --title "Card index $(date -u +%Y-%m-%d)" \
+            --title "Card index $stamp" \
             --notes "$(jq length id_mapping.json) artworks. Built by the weekly refresh."
           echo "$tag" > index_version.txt
           git config user.name "github-actions[bot]"

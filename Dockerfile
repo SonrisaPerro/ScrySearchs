@@ -16,4 +16,8 @@ ENV HF_HUB_OFFLINE=1
 
 COPY . .
 
+# Nothing at runtime needs to write, so run without root.
+RUN useradd --system --no-create-home scry
+USER scry
+
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

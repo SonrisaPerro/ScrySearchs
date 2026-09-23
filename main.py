@@ -122,6 +122,9 @@ async def simple_rate_limiter(request: Request, call_next):
     window_start = now - RATE_LIMIT_WINDOW
 
     async with rate_limit_lock:
+        if len(rate_limit_store) > 10_000:  # forget visitors who've been quiet for a whole window
+            for ip in [ip for ip, times in rate_limit_store.items() if not times or times[-1] <= window_start]:
+                del rate_limit_store[ip]
         request_times = rate_limit_store[client_ip]
         while request_times and request_times[0] <= window_start:
             request_times.popleft()

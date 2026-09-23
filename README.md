@@ -32,6 +32,7 @@ Every unique piece of card art on Scryfall gets run through a CLIP model (`clip-
 - `launch.py`: starts everything locally and opens your browser.
 - `index_version.txt`: which GitHub Release holds the current index.
 - `.github/workflows/refresh-index.yml`: the weekly job that keeps the index current.
+- `check.py`: smoke checks against a running server (`python check.py https://...`). The weekly job runs them on each new index before publishing it.
 
 ## Running it yourself
 
