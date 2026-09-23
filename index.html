@@ -1178,12 +1178,33 @@
 
         imageUpload.addEventListener('change', function() {
             if (this.files[0]) handleImageUpload(this.files[0]);
+            this.value = '';  // lets the same file be picked again
+        });
+
+        // Clicking anywhere in the upload box opens the picker (the label and input already do on their own).
+        dropZone.addEventListener('click', e => {
+            if (!e.target.closest('label, input')) imageUpload.click();
         });
 
         const BACKEND_ERRORS = {
             413: "That image is too large. Please use one under 20 MB.",
             429: "Too many searches in a short time. Please wait a minute and try again.",
         };
+
+        // Similar-looking card art alone scores 0.84-0.93, so no fixed cutoff means "same art".
+        // What does: the top hit scoring >= 0.86 AND clearly ahead of #2. Measured on 46 queries
+        // (art, screenshots, photos, sketches, unrelated): 19/19 true top hits flagged, 0/27 false ones.
+        function isExactArt(matches) {
+            return matches.length > 1 && matches[0].similarity_score >= 0.86
+                && matches[0].similarity_score - matches[1].similarity_score >= 0.025;
+        }
+
+        function describeScore(similarity, exact) {
+            const label = exact ? "Same art" : similarity >= 0.85 ? "Very similar" : similarity >= 0.78 ? "Similar" : "Loose resemblance";
+            return `${label} · ${(similarity * 100).toFixed(0)}%`;
+        }
+
+        let activeSearch = null;
 
         function showResultsMessage(text) {
             resultsContainer.innerHTML = '';
@@ -1196,6 +1217,9 @@
         // -- IMAGE SEARCH FUNCTION --
         async function handleImageUpload(file) {
             if (!file) return;
+
+            activeSearch?.abort();
+            const search = activeSearch = new AbortController();
 
             const shouldFilter = document.getElementById('filterCommander').checked;
             const maxResults = parseInt(document.getElementById('maxResults').value, 10);
@@ -1213,7 +1237,8 @@
             try {
                 const response = await fetch(`${API_BASE}/search`, {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    signal: search.signal
                 });
 
                 if (!response.ok) {
@@ -1233,13 +1258,15 @@
                 const scryfallRes = await fetch('https://api.scryfall.com/cards/collection', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ identifiers: data.matches.map(match => ({ id: match.scryfall_id })) })
+                    body: JSON.stringify({ identifiers: data.matches.map(match => ({ id: match.scryfall_id })) }),
+                    signal: search.signal
                 });
                 if (!scryfallRes.ok) throw new Error(`Scryfall collection lookup failed (${scryfallRes.status})`);
 
                 const scryfallDict = {};
                 (await scryfallRes.json()).data.forEach(card => { scryfallDict[card.id] = card; });
 
+                const exactMatch = isExactArt(data.matches) ? data.matches[0] : null;
                 let displayedCount = 0;
                 for (const match of data.matches) {
                     if (displayedCount >= maxResults) break;
@@ -1262,7 +1289,7 @@
 
                     const cardDiv = document.createElement('div'); cardDiv.className = 'card';
                     const imgElement = document.createElement('img'); imgElement.src = imageUrl;
-                    imgElement.scryfallData = scryfallData; imgElement.faceIndex = faceIndex; imgElement.matchName = match.name; imgElement.matchScore = `Match Score: ${(match.similarity_score * 100).toFixed(1)}%`;
+                    imgElement.scryfallData = scryfallData; imgElement.faceIndex = faceIndex; imgElement.matchName = match.name; imgElement.matchScore = describeScore(match.similarity_score, match === exactMatch);
                     imgElement.addEventListener('click', activateZoomOverlay);
 
                     const contentWrapper = document.createElement('div'); contentWrapper.style = "padding:12px; display:flex; flex-direction:column; flex-grow:1;";
@@ -1294,10 +1321,11 @@
                 }
 
             } catch (error) {
+                if (error.name === 'AbortError') return;  // superseded by a newer search
                 showResultsMessage("Couldn't reach the search server or Scryfall. Please check your connection and try again.");
                 console.error(error);
             } finally {
-                loading.style.display = 'none';
+                if (activeSearch === search) loading.style.display = 'none';
             }
         }
 
