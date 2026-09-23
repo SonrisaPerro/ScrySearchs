@@ -420,10 +420,6 @@
             align-self: center;
         }
 
-        .badge::before {
-            content: '⚔';
-            font-size: 0.6rem;
-        }
 
         /* TCGplayer Button Styles */
         .buy-btn {
@@ -963,7 +959,7 @@
 <body>
 
     <div class="stats-tracker">
-        🏆 Scans: <span id="scan-count-display">0</span>
+        Scans: <span id="scan-count-display">0</span>
         <button onclick="document.getElementById('achievementsModal').style.display='block'" style="display:block; margin-top:5px; width:100%; background:var(--accent-blue); color:white; border:1px solid #000; cursor:pointer; font-family:inherit;">View Achievements</button>
     </div>
 
@@ -977,7 +973,7 @@
 
     <div id="cropModal" class="achievements-modal crop-modal" role="dialog" aria-label="Crop your image">
         <div class="achievements-header">
-            <span>&#9986; Crop your image</span>
+            <span>Crop your image</span>
             <button onclick="closeCrop()" style="cursor:pointer; background:#c0c0c0; border:2px solid; border-color:#fff #808080 #808080 #fff; font-weight:bold; color:#000;">X</button>
         </div>
         <div class="achievement-list">
@@ -995,7 +991,7 @@
 
     <div id="printingsModal" class="achievements-modal printings-modal">
         <div class="achievements-header">
-            <span id="printingsTitle">💰 Printings</span>
+            <span id="printingsTitle">Printings</span>
             <button onclick="closePrintings()" style="cursor:pointer; background:#c0c0c0; border:2px solid; border-color:#fff #808080 #808080 #fff; font-weight:bold; color:#000;">X</button>
         </div>
         <div class="printings-source" id="printingsSource"></div>
@@ -1059,7 +1055,7 @@
         <br>
         <img id="preview" alt="Image preview">
         <br>
-        <button type="button" id="cropBtn" class="preset-btn crop-btn" hidden>&#9986; Crop &amp; search again</button>
+        <button type="button" id="cropBtn" class="preset-btn crop-btn" hidden>Crop &amp; search again</button>
     </div>
 
     <div class="upload-container text-search-box">
@@ -1220,7 +1216,7 @@
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
             toast.className = 'retro-toast';
-            toast.innerHTML = `<span style="color:var(--accent-orange)">⭐ ACHIEVEMENT UNLOCKED!</span><br>${icon} ${title}`;
+            toast.innerHTML = `<span style="color:var(--accent-orange)">ACHIEVEMENT UNLOCKED!</span><br>${icon} ${title}`;
             container.appendChild(toast);
             setTimeout(() => { if(toast.parentNode) toast.parentNode.removeChild(toast); }, 5000);
         }
@@ -1741,7 +1737,7 @@
 
         async function showPrintings(illustrationId, name, tile, button) {
             markActivePrintings(tile, button);
-            printingsTitle.textContent = `💰 ${name}`;
+            printingsTitle.textContent = `Printings: ${name}`;
             printingsSource.innerHTML = '';
             const faces = tile.querySelector('img').scryfallData.card_faces || [];
             const artUrl = tile.querySelector('img').scryfallData.image_uris?.art_crop
