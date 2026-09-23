@@ -144,7 +144,7 @@ def card_filter(
     colors: str = Query("", description="'Fits my deck' colour identity, e.g. UR; C alone = colourless only"),
     types: str = Query("", description="Comma-separated: creature,land,instant,artifact,enchantment,planeswalker,battle"),
     format: str = Query("", description="Legal in this format: " + ", ".join(FORMATS)),
-    hide_oddities: bool = Query(False, description="Hide tokens, emblems, planes, schemes and vanguards"),
+    hide_oddities: bool = Query(False, description="Hide tokens, emblems, planes, schemes, vanguards and digital-only art"),
 ) -> Optional[np.ndarray]:
     """Which index rows a search may return, or None when nothing is filtered."""
     colors = colors.upper()

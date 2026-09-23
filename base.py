@@ -31,28 +31,40 @@ PLACEHOLDER_STATUSES = {"missing", "placeholder"}
 MAPPING_FIELDS = ("scryfall_id", "name", "illustration_id", "ci", "t", "f", "odd")
 
 
+def is_digital(card: Dict[str, Any]) -> bool:
+    """Arena/MTGO-only printings, including Alchemy sets and "A-" rebalanced cards."""
+    return bool(card.get("digital")) or card.get("set_type") == "alchemy" or card["name"].startswith("A-")
+
+
 def filter_metadata(card: Dict[str, Any], type_line: str) -> Dict[str, int]:
-    """Colour identity, card types, legal formats and token-ness as the bitmasks main.py filters on."""
+    """Colour identity, card types, legal formats and oddness as the bitmasks main.py filters on."""
     legal = card.get("legalities", {})
     type_words = set(re.findall(r"[a-z]+", type_line.lower()))
     return {
         "ci": sum(COLOR_BITS[c] for c in card.get("color_identity", []) if c in COLOR_BITS),
         "t": sum({bit for word, bit in TYPE_BITS.items() if word in type_words}),
         "f": sum(1 << i for i, fmt in enumerate(FORMATS) if legal.get(fmt) in ("legal", "restricted")),
-        "odd": int(card.get("layout") in ODD_LAYOUTS),
+        # Art that only exists digitally counts as an oddity; fetch_artworks prefers a paper printing,
+        # so this only sticks when no paper card uses the art.
+        "odd": int(card.get("layout") in ODD_LAYOUTS or is_digital(card)),
     }
 
 
 def fetch_artworks(session: requests.Session) -> List[Dict[str, str]]:
-    """One entry per illustration, from Scryfall's unique_artwork bulk file."""
+    """One entry per illustration, represented by a paper printing whenever one uses that art.
+
+    Built from every printing (default_cards) rather than Scryfall's unique_artwork file, which
+    sometimes picks an Arena-only "A-" rebalanced card for art that is also printed on paper.
+    """
     bulk_types = session.get(BULK_META_URL).json()["data"]
-    url = next(b["jsonl_download_uri"] for b in bulk_types if b["type"] == "unique_artwork")
+    url = next(b["jsonl_download_uri"] for b in bulk_types if b["type"] == "default_cards")
     logger.info("Downloading %s", url)
     response = session.get(url)
     response.raise_for_status()
 
     artworks: Dict[str, Dict[str, str]] = {}
-    for line in gzip.decompress(response.content).splitlines():
+    ranks: Dict[str, tuple] = {}
+    for line in gzip.GzipFile(fileobj=BytesIO(response.content)):  # streamed; ~0.5 GB unzipped
         card = json.loads(line)
         # Art Series cards are collectible art prints, not playable cards, and their backs all share
         # one generic logo image.
@@ -63,11 +75,17 @@ def fetch_artworks(session: requests.Session) -> List[Dict[str, str]]:
         for face in faces:
             art_id = face.get("illustration_id")
             art_url = (face.get("image_uris") or {}).get("art_crop")
-            if art_id and art_url and art_id not in artworks:
-                name = card["name"] if face is card else f"{card['name']} ({face['name']})"
-                type_line = face.get("type_line") or card.get("type_line", "")
-                artworks[art_id] = {"scryfall_id": card["id"], "name": name, "illustration_id": art_id,
-                                    "art_url": art_url, **filter_metadata(card, type_line)}
+            if not (art_id and art_url):
+                continue
+            # Paper over digital, then the card's original printing; the card id keeps ties stable.
+            rank = (is_digital(card), card.get("released_at", "9999"), card["id"])
+            if art_id in ranks and ranks[art_id] <= rank:
+                continue
+            ranks[art_id] = rank
+            name = card["name"] if face is card else f"{card['name']} ({face['name']})"
+            type_line = face.get("type_line") or card.get("type_line", "")
+            artworks[art_id] = {"scryfall_id": card["id"], "name": name, "illustration_id": art_id,
+                                "art_url": art_url, **filter_metadata(card, type_line)}
 
     # Stable order, so an unchanged catalog produces a byte-identical mapping.
     return sorted(artworks.values(), key=lambda a: (a["name"], a["illustration_id"]))

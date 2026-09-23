@@ -108,6 +108,15 @@ def main():
         for c, x in zip(combo_cards, combo)))
     check("colourless-only is obeyed", all(not c["color_identity"] for c in colorless_cards))
 
+    # Alchemy/Arena-only art is an oddity; art also printed on paper shows as the paper card.
+    kemba = jpeg(scryfall_card("Kemba's Outfitter")["image_uris"]["art_crop"])
+    shown = image_search(kemba).json()["matches"]
+    hidden = image_search(kemba, hide_oddities="true").json()["matches"]
+    check("Alchemy-only art is found when oddities are shown", shown[0]["name"] == "Kemba's Outfitter", shown[0]["name"])
+    check("...and hidden with the oddities", all(x["name"] != "Kemba's Outfitter" for x in hidden))
+    teferi = image_search(jpeg(scryfall_card("A-Teferi, Time Raveler")["image_uris"]["art_crop"]), hide_oddities="true").json()["matches"]
+    check("rebalanced 'A-' art shows as the paper card", teferi[0]["name"] == "Teferi, Time Raveler", teferi[0]["name"])
+
     # Bad input is refused cleanly.
     check("unknown filter value -> 400", text_search("x", colors="Q").status_code == 400)
     check("empty description -> 400", text_search("").status_code == 400)

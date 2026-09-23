@@ -69,7 +69,7 @@ All three also take these optional filters as query parameters:
 - `colors`: colour identity that has to fit inside these, like `UR`. `C` on its own means colourless only.
 - `types`: comma-separated, any of `creature`, `land`, `instant` (covers sorceries too), `artifact`, `enchantment`, `planeswalker`, `battle`.
 - `format`: legal in one of `commander`, `standard`, `pioneer`, `modern`, `legacy`, `vintage`, `pauper`.
-- `hide_oddities=true`: no tokens, emblems, planes, schemes or vanguards.
+- `hide_oddities=true`: no tokens, emblems, planes, schemes or vanguards, and no art that only exists digitally (Alchemy and other Arena-only cards). Art that's also on a paper card is always shown as the paper card.
 
 Filtering happens inside the search, so you get the best 30 matches among cards that pass, not whatever's left of an unfiltered 30. Bad values get a 400.
 
