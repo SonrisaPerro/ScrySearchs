@@ -3,8 +3,9 @@
     python check.py                                        # local server on port 8000
     python check.py https://scryfallsearch.up.railway.app  # the live site
 
-Exits non-zero if anything fails. The weekly refresh runs this against the freshly
-built index before publishing it, so a broken index never reaches the site.
+Exits 1 if a check fails, or 2 if Scryfall couldn't be reached to run them (not an index
+problem; just re-run later). The weekly refresh runs this against the freshly built index
+before publishing it, so a broken index never reaches the site.
 """
 import io
 import sys
@@ -12,10 +13,29 @@ import time
 
 import requests
 from PIL import Image
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 BASE = (sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8000").rstrip("/")
 SCRYFALL = {"User-Agent": "ScrySearchs-check/1.0", "Accept": "*/*"}
 failures = []
+
+# Test cards are pinned to exact printings (set, collector number): Scryfall has retired card
+# names before ("A-" rebalanced cards), but old printings stay put.
+FINAL_FLARE = ("thb", "134")
+LLANOWAR_ELVES = ("fdn", "227")
+KEMBAS_OUTFITTER = ("yone", "2")        # Alchemy-only, digital
+TEFERI_TIME_RAVELER = ("war", "221")    # its art also had an Arena-only "A-" printing
+
+# Ride out brief Scryfall hiccups (rate limits, 5xx) instead of failing the whole run.
+scryfall = requests.Session()
+scryfall.headers.update(SCRYFALL)
+scryfall.mount("https://", HTTPAdapter(max_retries=Retry(
+    total=4, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504], allowed_methods=None)))
+
+
+class ScryfallUnavailable(Exception):
+    """Scryfall couldn't be reached; says nothing about the index."""
 
 
 def check(name, ok, detail=""):
@@ -24,15 +44,22 @@ def check(name, ok, detail=""):
         failures.append(name)
 
 
-def scryfall_card(name, **params):
+def from_scryfall(method, url, **kwargs):
     time.sleep(0.1)  # Scryfall asks for 50-100 ms between API calls
-    r = requests.get("https://api.scryfall.com/cards/named", params={"exact": name, **params}, headers=SCRYFALL, timeout=30)
-    r.raise_for_status()
-    return r.json()
+    try:
+        r = scryfall.request(method, url, timeout=30, **kwargs)
+        r.raise_for_status()
+    except requests.RequestException as exc:
+        raise ScryfallUnavailable(f"{method} {url}: {exc}") from exc
+    return r
+
+
+def printing(set_code, number):
+    return from_scryfall("GET", f"https://api.scryfall.com/cards/{set_code}/{number}").json()
 
 
 def jpeg(url):
-    img = Image.open(io.BytesIO(requests.get(url, headers=SCRYFALL, timeout=30).content)).convert("RGB")
+    img = Image.open(io.BytesIO(from_scryfall("GET", url).content)).convert("RGB")
     buf = io.BytesIO()
     img.save(buf, "JPEG", quality=90)
     return buf.getvalue()
@@ -52,10 +79,7 @@ def lookup(matches):
     ids = [{"id": m["scryfall_id"]} for m in matches]
     cards = {}
     for start in range(0, len(ids), 75):
-        time.sleep(0.1)
-        r = requests.post("https://api.scryfall.com/cards/collection", json={"identifiers": ids[start:start + 75]},
-                          headers=SCRYFALL, timeout=30)
-        r.raise_for_status()
+        r = from_scryfall("POST", "https://api.scryfall.com/cards/collection", json={"identifiers": ids[start:start + 75]})
         cards.update({c["id"]: c for c in r.json()["data"]})
     return [cards[m["scryfall_id"]] for m in matches if m["scryfall_id"] in cards]
 
@@ -70,14 +94,14 @@ def main():
     check("server is up", r.ok and r.json().get("status") == "ok", f"HTTP {r.status_code}")
 
     # Image search: exact art at #1, labelled "Same art" by the page's rule (>= 0.86 and 0.025 ahead of #2).
-    flare = scryfall_card("Final Flare")
+    flare = printing(*FINAL_FLARE)
     m = image_search(jpeg(flare["image_uris"]["art_crop"])).json()["matches"]
     same_art = m[0]["similarity_score"] >= 0.86 and m[0]["similarity_score"] - m[1]["similarity_score"] >= 0.025
     check("art upload finds the card at #1", m[0]["name"] == "Final Flare", m[0]["name"])
     check("...and would be labelled 'Same art'", same_art, f"{m[0]['similarity_score']} vs {m[1]['similarity_score']}")
 
     # A screenshot of the whole card should match through the art-box crop.
-    elves = scryfall_card("Llanowar Elves")
+    elves = printing(*LLANOWAR_ELVES)
     m = image_search(jpeg(elves["image_uris"]["normal"])).json()["matches"]
     rank = next((i + 1 for i, x in enumerate(m) if x["name"] == "Llanowar Elves"), None)
     check("full-card screenshot finds the card in the top 5", rank is not None and rank <= 5, f"rank {rank}")
@@ -109,14 +133,13 @@ def main():
     check("colourless-only is obeyed", all(not c["color_identity"] for c in colorless_cards))
 
     # Alchemy/Arena-only art is an oddity; art also printed on paper shows as the paper card.
-    kemba = jpeg(scryfall_card("Kemba's Outfitter")["image_uris"]["art_crop"])
+    kemba = jpeg(printing(*KEMBAS_OUTFITTER)["image_uris"]["art_crop"])
     shown = image_search(kemba).json()["matches"]
     hidden = image_search(kemba, hide_oddities="true").json()["matches"]
     check("Alchemy-only art is found when oddities are shown", shown[0]["name"] == "Kemba's Outfitter", shown[0]["name"])
     check("...and hidden with the oddities", all(x["name"] != "Kemba's Outfitter" for x in hidden))
     # This art also had an Arena-only "A-" rebalanced printing; it must come back as the paper card.
-    # (Looked up by the paper printing: Scryfall has since dropped the "A-" names.)
-    teferi = image_search(jpeg(scryfall_card("Teferi, Time Raveler", set="war")["image_uris"]["art_crop"]), hide_oddities="true").json()["matches"]
+    teferi = image_search(jpeg(printing(*TEFERI_TIME_RAVELER)["image_uris"]["art_crop"]), hide_oddities="true").json()["matches"]
     check("art shared with an Arena printing shows as the paper card", teferi[0]["name"] == "Teferi, Time Raveler", teferi[0]["name"])
 
     # Bad input is refused cleanly.
@@ -137,6 +160,9 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except ScryfallUnavailable as exc:
+        print(f"COULDN'T CHECK  Scryfall unreachable, so this says nothing about the index; re-run later.\n  {exc}")
+        sys.exit(2)
     except Exception as exc:  # a crash mid-run is a failure too, just a less tidy one
         print(f"FAIL  check run crashed: {exc!r}")
         sys.exit(1)
