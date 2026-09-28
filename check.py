@@ -24,9 +24,9 @@ def check(name, ok, detail=""):
         failures.append(name)
 
 
-def scryfall_card(name):
+def scryfall_card(name, **params):
     time.sleep(0.1)  # Scryfall asks for 50-100 ms between API calls
-    r = requests.get("https://api.scryfall.com/cards/named", params={"exact": name}, headers=SCRYFALL, timeout=30)
+    r = requests.get("https://api.scryfall.com/cards/named", params={"exact": name, **params}, headers=SCRYFALL, timeout=30)
     r.raise_for_status()
     return r.json()
 
@@ -114,8 +114,10 @@ def main():
     hidden = image_search(kemba, hide_oddities="true").json()["matches"]
     check("Alchemy-only art is found when oddities are shown", shown[0]["name"] == "Kemba's Outfitter", shown[0]["name"])
     check("...and hidden with the oddities", all(x["name"] != "Kemba's Outfitter" for x in hidden))
-    teferi = image_search(jpeg(scryfall_card("A-Teferi, Time Raveler")["image_uris"]["art_crop"]), hide_oddities="true").json()["matches"]
-    check("rebalanced 'A-' art shows as the paper card", teferi[0]["name"] == "Teferi, Time Raveler", teferi[0]["name"])
+    # This art also had an Arena-only "A-" rebalanced printing; it must come back as the paper card.
+    # (Looked up by the paper printing: Scryfall has since dropped the "A-" names.)
+    teferi = image_search(jpeg(scryfall_card("Teferi, Time Raveler", set="war")["image_uris"]["art_crop"]), hide_oddities="true").json()["matches"]
+    check("art shared with an Arena printing shows as the paper card", teferi[0]["name"] == "Teferi, Time Raveler", teferi[0]["name"])
 
     # Bad input is refused cleanly.
     check("unknown filter value -> 400", text_search("x", colors="Q").status_code == 400)
