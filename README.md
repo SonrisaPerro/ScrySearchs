@@ -9,7 +9,9 @@ Reverse image search for Magic card art. Give it a picture and it finds the card
 - **Search with an image.** Artwork, a screenshot of a card, a photo, a sketch. Screenshots of whole cards get the art cropped out automatically, since that's the only part the index knows about.
 - **Crop before searching.** Photo of a card sitting on a table? Box just the artwork and search again. Makes a big difference for phone pictures.
 - **Search by description.** Type something like "a goblin riding a bomb" and it'll find art that fits.
+- **Start from a card.** Type a card's name or paste its Scryfall link, and it finds art that looks like that card's.
 - **More like this.** Every result has a button to go find art that looks like *that* card.
+- **Artist credit.** Each result names its artist, with a link to the rest of their cards on Scryfall.
 - **Printings & prices.** See every paper printing that uses the same art, cheapest first, with a link to buy it.
 - **Filters.** Colours (what fits your deck, Commander-style), card type, format, and hiding tokens and other oddities. They work on every kind of search.
 
@@ -31,6 +33,7 @@ Every unique piece of card art on Scryfall gets run through a CLIP model (`clip-
 - `base.py`: builds the index, or updates it with only the new art.
 - `launch.py`: starts everything locally and opens your browser.
 - `index_version.txt`: which GitHub Release holds the current index.
+- `preview.png`: the picture that shows up when someone shares a link to the site.
 - `.github/workflows/refresh-index.yml`: the weekly job that keeps the index current.
 - `check.py`: smoke checks against a running server (`python check.py https://...`). The weekly job runs them on each new index before publishing it.
 

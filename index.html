@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MTG Reverse Image Search</title>
     <meta name="description" content="Reverse image search for Magic: The Gathering card art. Upload a picture or describe the art to find the card.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="MTG Reverse Image Search">
+    <meta property="og:description" content="Find a Magic card from its art. Upload a picture, describe it, or start from a card you know.">
+    <meta property="og:url" content="https://scryfallsearch.up.railway.app/">
+    <meta property="og:image" content="https://sonrisaperro.github.io/ScrySearchs/preview.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23c0c0c0'/%3E%3Crect x='2' y='2' width='28' height='7' fill='%23000080'/%3E%3Crect x='2' y='11' width='28' height='19' fill='%23fff'/%3E%3Ccircle cx='14' cy='19' r='5' fill='none' stroke='%230066ff' stroke-width='3'/%3E%3Cpath d='M18 23l6 5' stroke='%230066ff' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Comfortaa:wght@700&display=swap');
 
@@ -163,8 +170,9 @@
         input[type="file"] { display: none; }
 
         .upload-btn {
-            background: linear-gradient(180deg, #00cc33 0%, #00aa22 100%);
+            background: linear-gradient(180deg, #00b82e 0%, #008f1d 100%);
             color: #fff;
+            text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
             padding: clamp(10px, 3vw, 12px) clamp(20px, 5vw, 28px);
             border-radius: 25px;
             cursor: pointer;
@@ -279,7 +287,7 @@
         #preview {
             max-width: 200px;
             max-height: 200px;
-            margin-top: 15px;
+            margin: 15px auto 0;
             border-radius: 15px;
             display: none;
             border: 3px solid var(--accent-blue);
@@ -298,10 +306,6 @@
             width: 40px;
             height: 40px;
             animation: spin-smooth 1s linear infinite;
-            position: absolute;
-            top: calc(50% - 20px);
-            left: calc(50% - 20px);
-            z-index: 2;
             box-shadow: 0 0 10px rgba(0, 153, 255, 0.3);
         }
 
@@ -386,9 +390,18 @@
             font-weight: bold;
         }
 
+        .artist-credit {
+            font-size: clamp(0.6rem, 2vw, 0.7rem);
+            color: var(--accent-blue);
+            text-decoration: none;
+            margin-bottom: 6px;
+        }
+
+        .artist-credit:hover { text-decoration: underline; }
+
         .score {
             font-size: clamp(0.65rem, 2vw, 0.75rem);
-            color: var(--accent-green);
+            color: #006b00;  /* the bright accent green is unreadable as small text on grey */
             margin-bottom: 8px;
             font-weight: bold;
             font-family: 'Courier New', monospace;
@@ -418,7 +431,7 @@
         /* TCGplayer Button Styles */
         .buy-btn {
             background: var(--accent-green);
-            color: #fff;
+            color: #003300;  /* white on this green is too faint to read */
             text-decoration: none;
             padding: 8px 12px;
             border: 2px solid #003300;
@@ -582,10 +595,13 @@
         /* More like this: same chunky button, blue instead of green */
         .buy-btn { width: 100%; }
         .buy-btn + .buy-btn { margin-top: 6px; }
-        .alt-btn { background: var(--accent-blue); border-color: var(--border-hard); }
+        .alt-btn { background: var(--accent-blue); border-color: var(--border-hard); color: #fff; }
         .alt-btn:hover { background: #33ccff; }
 
         .text-search-box, .filters-box { cursor: default; }
+        /* The two typed searches sit side by side so the filters and results aren't a long scroll away */
+        .search-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+        .search-pair .upload-container { margin-bottom: 0; }
         .filters-box .controls { margin-top: 0; }
         .filter-label { font-weight: bold; }
         .mana-row { display: flex; gap: 6px; }
@@ -834,7 +850,8 @@
         }
 
         /* Floating Animations */
-        @keyframes float1 { 0% { top: 5%; left: 5%; } 100% { top: 15%; left: 10%; } }
+        /* float1 stays near the edge: the Contact window is wide and used to slide under the page column */
+        @keyframes float1 { 0% { top: 5%; left: 1%; } 100% { top: 15%; left: 3%; } }
         @keyframes float2 { 0% { bottom: 15%; right: 5%; } 100% { bottom: 25%; right: 15%; } }
         @keyframes float3 { 0% { top: 40%; right: 8%; } 100% { top: 30%; right: 12%; } }
 
@@ -842,11 +859,16 @@
         .win-2 { animation: float2 25s infinite alternate ease-in-out; }
         .win-3 { animation: float3 18s infinite alternate ease-in-out; }
 
+        @media (prefers-reduced-motion: reduce) {
+            .bg-window { animation: none; transition: none; }
+        }
+
         /* ============= MOBILE RESPONSIVENESS ============= */
         @media (max-width: 768px) {
             .bg-layer {
                 display: none;
             }
+            .search-pair { grid-template-columns: 1fr; }
             body {
                 padding: 1.5rem 0.75rem 5.5rem 0.75rem;
             }
@@ -875,7 +897,10 @@
                 padding: 1rem 0.5rem 5.5rem 0.5rem;
             }
             h1 {
-                font-size: clamp(1.3rem, 5vw, 1.8rem);
+                /* Two balanced lines read better on a phone than one tiny smudged one */
+                font-size: clamp(1.6rem, 7vw, 2rem);
+                text-wrap: balance;
+                text-shadow: 1px 1px 0px #000, -1px 0px 0px var(--accent-green), 1px -1px 0px var(--accent-orange);
                 margin-bottom: 0.3rem;
             }
             .upload-container {
@@ -915,16 +940,12 @@
             body {
                 padding: 0.75rem 0.5rem 5.5rem 0.5rem;
             }
-            h1 {
-                font-size: clamp(1.1rem, 4vw, 1.5rem);
-                margin-bottom: 0.2rem;
-            }
             .upload-container {
                 border: 3px solid var(--border-hard);
                 padding: 0.75rem;
             }
             #results {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, 1fr);  /* one giant card per row made ten results a very long scroll */
                 gap: 8px;
             }
             .app-footer {
@@ -1028,13 +1049,11 @@
         <p>Drag an image here OR paste from clipboard OR use the button.</p>
         <label for="imageUpload" class="upload-btn">Choose an Image File...</label>
         <input type="file" id="imageUpload" accept="image/*">
-        <br>
-        <br>
         <img id="preview" alt="Image preview">
-        <br>
         <button type="button" id="cropBtn" class="preset-btn crop-btn" hidden>Crop &amp; search again</button>
     </div>
 
+    <div class="search-pair">
     <div class="upload-container text-search-box">
         <h3>2. Search by Description</h3>
         <p>Describe the art you're picturing, like "a goblin riding a bomb" or "a quiet snowy forest at night".</p>
@@ -1042,6 +1061,16 @@
             <input type="text" id="textQuery" maxlength="200" placeholder="Describe the artwork..." aria-label="Describe the artwork" required>
             <button type="submit" class="upload-btn">Search</button>
         </form>
+    </div>
+
+    <div class="upload-container text-search-box">
+        <h3>3. Start from a Card</h3>
+        <p>Type a card's name or paste its Scryfall link to find art that looks like it.</p>
+        <form id="cardSearchForm" class="text-search-row">
+            <input type="text" id="cardQuery" maxlength="200" placeholder="Card name or Scryfall link..." aria-label="Card name or Scryfall link" required>
+            <button type="submit" class="upload-btn">Search</button>
+        </form>
+    </div>
     </div>
 
     <div class="upload-container filters-box">
@@ -1111,7 +1140,7 @@
         </div>
     </div>
 
-    <h3 id="resultsHeading">3. Match Results</h3>
+    <h3 id="resultsHeading">4. Match Results</h3>
     <div id="loading" class="loader"></div>
     <div id="results"></div>
 
@@ -1502,6 +1531,14 @@
                     const scoreElement = document.createElement('div'); scoreElement.className = 'score'; scoreElement.textContent = imgElement.matchScore;
 
                     cardDiv.appendChild(imgElement); contentWrapper.appendChild(nameElement);
+                    const artist = faces[faceIndex]?.artist || scryfallData.artist;
+                    if (artist) {
+                        const credit = document.createElement('a'); credit.className = 'artist-credit';
+                        credit.href = `https://scryfall.com/search?${new URLSearchParams({ q: `artist:"${artist}"`, unique: 'art' })}`;
+                        credit.target = '_blank'; credit.rel = 'noopener'; credit.title = `More art by ${artist} on Scryfall`;
+                        credit.textContent = `Art: ${artist} ↗`;
+                        contentWrapper.appendChild(credit);
+                    }
                     if (scryfallData.legalities && scryfallData.legalities.commander === 'banned') {
                         const bannedBadge = document.createElement('div'); bannedBadge.className = 'badge'; bannedBadge.textContent = 'BANNED IN EDH'; contentWrapper.appendChild(bannedBadge);
                     }
@@ -1566,7 +1603,7 @@
             if (!cropped) originalUpload = file;
             if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);  // free the last upload
             preview.src = URL.createObjectURL(file);
-            preview.style.display = 'inline-block';
+            preview.style.display = 'block';
             cropBtn.hidden = false;
 
             const leniency = document.getElementById('leniencySlider').value;
@@ -1688,6 +1725,44 @@
                 labelFor: () => match => describeScore(match.similarity_score, false),
             });
         }
+
+        // -- 3. START FROM A CARD: look the card up on Scryfall, then reuse "more like this" --
+        async function searchByCard(input) {
+            input = input.trim();
+            if (!input) return;
+            const link = input.match(new RegExp('scryfall[.]com/card/([^/]+)/([^/?#]+)', 'i'));
+            const lookup = link ? `https://api.scryfall.com/cards/${link[1]}/${link[2]}`
+                : `https://api.scryfall.com/cards/named?${new URLSearchParams({ fuzzy: input })}`;
+
+            activeSearch?.abort();
+            const search = activeSearch = new AbortController();
+            closePrintings();
+            resultsContainer.innerHTML = '';
+            loading.style.display = 'block';
+            const fail = text => { loading.style.display = 'none'; showResultsMessage(text); };
+            try {
+                const res = await fetch(lookup, { signal: search.signal });
+                if (res.status === 404) {
+                    // Scryfall explains itself here ("Too many cards match ambiguous name...").
+                    const details = await res.json().then(d => d.details, () => null);
+                    return fail(details || `Scryfall doesn't know a card called “${input}”.`);
+                }
+                if (!res.ok) throw new Error(`Scryfall lookup failed (${res.status})`);
+                const card = await res.json();
+                const art = card.illustration_id ?? card.card_faces?.find(f => f.illustration_id)?.illustration_id;
+                if (!art) return fail(`${card.name} doesn't have artwork to search from.`);
+                showSimilar(art);
+            } catch (error) {
+                if (error.name === 'AbortError') return;
+                fail("Couldn't reach Scryfall. Please check your connection and try again.");
+                console.error(error);
+            }
+        }
+
+        document.getElementById('cardSearchForm').addEventListener('submit', e => {
+            e.preventDefault();
+            searchByCard(document.getElementById('cardQuery').value);
+        });
 
         // -- PRINTINGS & PRICES: every paper printing that uses this exact art, cheapest first --
         const printingsModal = document.getElementById('printingsModal');
