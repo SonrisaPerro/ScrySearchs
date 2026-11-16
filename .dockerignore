@@ -1,5 +1,8 @@
 .git
+.github
 __pycache__
+README.md
+*.part
 # Local copies may be stale; the image fetches the release named in index_version.txt.
 scryfall_index.faiss
 id_mapping.json

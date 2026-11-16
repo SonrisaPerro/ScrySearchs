@@ -4,20 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MTG Reverse Image Search</title>
+    <meta name="description" content="Reverse image search for Magic: The Gathering card art. Upload a picture or describe the art to find the card.">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Comfortaa:wght@700&display=swap');
 
         :root {
-            --bg-1: #87ceeb;
-            --bg-2: #e0f6ff;
-            --surface: #ffffff;
             --surface-hover: #f0f8ff;
             --text: #2c3e50;
             --accent-blue: #0066ff;
             --accent-green: #00cc00;
             --accent-orange: #ff6600;
             --accent-purple: #9933ff;
-            --accent-pink: #ff0099;
             --shadow: rgba(0, 0, 0, 0.15);
             --highlight: rgba(255, 255, 255, 0.6);
             --border-hard: #0033cc;
@@ -418,7 +415,6 @@
             align-self: center;
         }
 
-
         /* TCGplayer Button Styles */
         .buy-btn {
             background: var(--accent-green);
@@ -570,6 +566,8 @@
             background: darkblue; color: white; padding: 5px 10px; font-weight: bold;
             display: flex; justify-content: space-between; align-items: center;
         }
+
+        .achievements-header .bg-window-close { font-size: 13px; padding: 1px 6px; }
 
         .achievement-list { padding: 10px; background: #fff; border: 2px inset #fff; margin: 5px; }
         .achievement-item {
@@ -821,21 +819,6 @@
             padding: 6px 0;
         }
 
-        .contact-tab .contact-card .contact-body [contenteditable] {
-            min-width: 180px;
-            display: block;
-            padding: 6px;
-            border: 1px dashed #d0d8e0;
-            border-radius: 4px;
-            background: #fbfdff;
-        }
-
-        .contact-tab .contact-actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 8px;
-        }
-
         .contact-tab .btn {
             background: var(--accent-orange);
             color: #000;
@@ -961,7 +944,7 @@
     <div id="achievementsModal" class="achievements-modal">
         <div class="achievements-header">
             <span>🏅 Player Unlocks</span>
-            <button onclick="document.getElementById('achievementsModal').style.display='none'" style="cursor:pointer; background:#c0c0c0; border:2px solid; border-color:#fff #808080 #808080 #fff; font-weight:bold; color:#000;">X</button>
+            <button onclick="document.getElementById('achievementsModal').style.display='none'" class="bg-window-close" aria-label="Close">X</button>
         </div>
         <div class="achievement-list" id="achievementListUI"></div>
     </div>
@@ -969,7 +952,7 @@
     <div id="cropModal" class="achievements-modal crop-modal" role="dialog" aria-label="Crop your image">
         <div class="achievements-header">
             <span>Crop your image</span>
-            <button onclick="closeCrop()" style="cursor:pointer; background:#c0c0c0; border:2px solid; border-color:#fff #808080 #808080 #fff; font-weight:bold; color:#000;">X</button>
+            <button onclick="closeCrop()" class="bg-window-close" aria-label="Close">X</button>
         </div>
         <div class="achievement-list">
             <p class="crop-hint">Drag a box around <strong>just the artwork</strong>. Leave out the card's name and text box, and anything behind the card.</p>
@@ -987,7 +970,7 @@
     <div id="printingsModal" class="achievements-modal printings-modal">
         <div class="achievements-header">
             <span id="printingsTitle">Printings</span>
-            <button onclick="closePrintings()" style="cursor:pointer; background:#c0c0c0; border:2px solid; border-color:#fff #808080 #808080 #fff; font-weight:bold; color:#000;">X</button>
+            <button onclick="closePrintings()" class="bg-window-close" aria-label="Close">X</button>
         </div>
         <div class="printings-source" id="printingsSource"></div>
         <div class="achievement-list" id="printingsList"></div>
@@ -999,27 +982,27 @@
         <div class="bg-window win-1 contact-tab" style="top: 8%; left: 2%; width: 320px; height: auto;">
             <div class="bg-window-header">
                 <span>✉ CONTACT</span>
-                <button class="bg-window-close" onclick="this.closest('.bg-window').style.display='none'">X</button>
+                <button class="bg-window-close" aria-label="Close" onclick="this.closest('.bg-window').style.display='none'">X</button>
             </div>
             <div class="bg-window-content">
                 <div class="contact-card">
                     <h4>Contact Me</h4>
                     <div class="contact-body">
-                        <div id="contactText" style="padding:6px; border:1px dashed #ccc; background:#f9f9f9; font-size:0.85rem;">
+                        <div style="padding:6px; border:1px dashed #ccc; background:#f9f9f9; font-size:0.85rem;">
                             Business Inquiries? Feedback? Just want to say hi? Drop me a line!
                         </div>
                         <div style="margin-top:8px; display:flex; gap:8px;">
-                                <a id="emailLink" class="btn" href="mailto:darkstartx@gmail.com?subject=MTG%20Search%20Inquiry" target="_blank">Email Me</a>
-                         </div>
-                     </div>
+                            <a class="btn" href="mailto:darkstartx@gmail.com?subject=MTG%20Search%20Inquiry">Email Me</a>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
 
         <div class="bg-window win-2" style="bottom: 12%; right: 2%; width: 260px; height: 140px;">
             <div class="bg-window-header">
                 <span>🔮 mana_generator.bat</span>
-                <button class="bg-window-close" onclick="this.closest('.bg-window').style.display='none'">X</button>
+                <button class="bg-window-close" aria-label="Close" onclick="this.closest('.bg-window').style.display='none'">X</button>
             </div>
             <div class="bg-window-content" style="background: #000; color: #fff; font-family: 'Courier New', monospace; font-size: 18px; padding: 12px; letter-spacing: 2px;">
                 <span id="manaScrambler">{W} {U} {B} {R} {G}</span>
@@ -1029,10 +1012,10 @@
         <div class="bg-window win-3" style="top: 25%; right: 2%; width: 200px; height: 200px;">
             <div class="bg-window-header">
                 <span>⚠️ SPONSOR</span>
-                <button class="bg-window-close" onclick="this.closest('.bg-window').style.display='none'">X</button>
+                <button class="bg-window-close" aria-label="Close" onclick="this.closest('.bg-window').style.display='none'">X</button>
             </div>
             <div class="bg-window-content" style="padding: 0; margin: 4px;">
-                <img id="retroAd" src="https://media.giphy.com/media/13HgwGsXF0aiGY/200h.webp" width="180" height="180" style="object-fit: cover;">
+                <img id="retroAd" src="https://media.giphy.com/media/13HgwGsXF0aiGY/200h.webp" width="180" height="180" alt="" style="object-fit: cover;">
             </div>
         </div>
     </div>
@@ -1046,7 +1029,6 @@
         <label for="imageUpload" class="upload-btn">Choose an Image File...</label>
         <input type="file" id="imageUpload" accept="image/*">
         <br>
-
         <br>
         <img id="preview" alt="Image preview">
         <br>
@@ -1144,10 +1126,10 @@
 
     <footer class="app-footer">
         <p>Keeping this awake costs money.</p>
-        <a href="https://ko-fi.com/sonriso" target="_blank" class="donate-link">☕ Support the Server</a>
+        <a href="https://ko-fi.com/sonriso" target="_blank" rel="noopener" class="donate-link">☕ Support the Server</a>
     </footer>
 
-   <script>
+    <script>
         const LINK_BASE = "";
 
         // GitHub Pages copy has no backend; everywhere else the page is served by main.py itself.
@@ -1213,7 +1195,7 @@
             toast.className = 'retro-toast';
             toast.innerHTML = `<span style="color:var(--accent-orange)">ACHIEVEMENT UNLOCKED!</span><br>${icon} ${title}`;
             container.appendChild(toast);
-            setTimeout(() => { if(toast.parentNode) toast.parentNode.removeChild(toast); }, 5000);
+            setTimeout(() => toast.remove(), 5000);
         }
 
         function unlockAchievement(id) {
@@ -1255,8 +1237,8 @@
                 el.innerHTML = `
                     <div class="ach-icon">${ach.icon}</div>
                     <div class="ach-details">
-                        <h4 style="margin: 0 0 5px 0; color: darkblue;">${title}</h4>
-                        <p style="margin: 0; font-size: 0.8rem; color: #333;">${desc}</p>
+                        <h4>${title}</h4>
+                        <p>${desc}</p>
                     </div>
                 `;
                 listUI.appendChild(el);
@@ -1334,7 +1316,7 @@
         }, false);
 
         document.body.addEventListener('paste', e => {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            const items = e.clipboardData.items;
             for (const item of items) {
                 if (item.kind === 'file' && item.type.indexOf("image") === 0) {
                     handleImageUpload(item.getAsFile());
@@ -1447,7 +1429,7 @@
             const search = activeSearch = new AbortController();
             closePrintings();  // its tile is about to be replaced
 
-            const maxResults = parseInt(document.getElementById('maxResults').value, 10);
+            const maxResults = parseInt(document.getElementById('maxResults').value, 10) || 10;
 
             resultsContainer.innerHTML = '';
             loading.style.display = 'block';
@@ -1515,7 +1497,7 @@
                     imgElement.scryfallData = scryfallData; imgElement.faceIndex = faceIndex; imgElement.matchName = match.name; imgElement.matchScore = label(match, displayedCount);  // position among shown tiles, after filters
                     imgElement.addEventListener('click', activateZoomOverlay);
 
-                    const contentWrapper = document.createElement('div'); contentWrapper.style = "padding:12px; display:flex; flex-direction:column; flex-grow:1;";
+                    const contentWrapper = document.createElement('div');  // styled by .card > div:not([class])
                     const nameElement = document.createElement('strong'); nameElement.textContent = match.name;
                     const scoreElement = document.createElement('div'); scoreElement.className = 'score'; scoreElement.textContent = imgElement.matchScore;
 
@@ -1822,8 +1804,6 @@
             if (e.target === zoomOverlay || e.target === zoomImage) closeZoomOverlay();
         });
 
-        flipBtn.addEventListener('click', (e) => e.stopPropagation());
-
         document.addEventListener('keydown', (e) => {
             if (e.key === "Escape" && zoomOverlay.classList.contains('active')) closeZoomOverlay();
             if (e.key === "Escape") { closePrintings(); closeCrop(); }
@@ -1850,12 +1830,12 @@
         });
 
         // ============= REACTIVE BACKGROUND LOGIC =============
+        const bgWindows = document.querySelectorAll('.bg-window');
         document.addEventListener('mousemove', (e) => {
             const x = (e.clientX / window.innerWidth - 0.5) * 40;
             const y = (e.clientY / window.innerHeight - 0.5) * 40;
 
-            const windows = document.querySelectorAll('.bg-window');
-            windows.forEach((win, index) => {
+            bgWindows.forEach((win, index) => {
                 const depth = (index + 1) * 0.8;
                 win.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
             });
@@ -1884,6 +1864,7 @@
             currentAd = (currentAd + 1) % adImages.length;
             adElement.src = adImages[currentAd];
         }, 4500);
+
         // Open a shared link: ?q=<description> or ?similar=<illustration id>
         const startParams = new URLSearchParams(location.search);
         applyFilterParams(startParams);

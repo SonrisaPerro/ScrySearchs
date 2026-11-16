@@ -56,10 +56,11 @@ def fetch_artworks(session: requests.Session) -> List[Dict[str, str]]:
     Built from every printing (default_cards) rather than Scryfall's unique_artwork file, which
     sometimes picks an Arena-only "A-" rebalanced card for art that is also printed on paper.
     """
-    bulk_types = session.get(BULK_META_URL).json()["data"]
-    url = next(b["jsonl_download_uri"] for b in bulk_types if b["type"] == "default_cards")
+    meta = session.get(BULK_META_URL, timeout=60)
+    meta.raise_for_status()
+    url = next(b["jsonl_download_uri"] for b in meta.json()["data"] if b["type"] == "default_cards")
     logger.info("Downloading %s", url)
-    response = session.get(url)
+    response = session.get(url, timeout=600)
     response.raise_for_status()
 
     artworks: Dict[str, Dict[str, str]] = {}
@@ -138,6 +139,7 @@ def main(full: bool = False, limit: Optional[int] = None) -> None:
     if not full:
         ensure_assets()
     previous = {} if full else load_previous_vectors()
+    previous_count = len(previous)
 
     with requests.Session() as session:
         session.headers.update({"User-Agent": USER_AGENT, "Accept": "*/*"})
@@ -151,6 +153,11 @@ def main(full: bool = False, limit: Optional[int] = None) -> None:
             previous.update(embed_artworks(session, model, new))
 
     kept = [a for a in artworks if a["illustration_id"] in previous]
+    # Scryfall only ever adds art. A big drop means a bad download (truncated bulk file, image CDN
+    # down), and the smoke checks only look at a handful of cards, so refuse to write it.
+    if limit is None and len(kept) < 0.95 * previous_count:
+        raise SystemExit(f"Refusing to save: {len(kept)} artworks, down from {previous_count}. "
+                         "Re-run later, or use --full if the drop is real.")
     matrix = np.vstack([previous[a["illustration_id"]] for a in kept]).astype("float32")
     index = faiss.IndexFlatIP(matrix.shape[1])
     index.add(matrix)

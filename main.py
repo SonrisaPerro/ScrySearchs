@@ -1,22 +1,23 @@
 ﻿import asyncio
-import os
 import json
+import os
 import threading
+import time
 import warnings
 from collections import defaultdict, deque
+from contextlib import asynccontextmanager
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, Deque, List, Optional
 
 import faiss
-import torch
 import numpy as np
+import torch
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image, ImageOps
 from sentence_transformers import SentenceTransformer
-from contextlib import asynccontextmanager
-from io import BytesIO
 
 from assets import (COLOR_BITS, FORMATS, INDEX_PATH, MAPPING_PATH, MODEL_NAME, ROOT_DIR, TYPE_BITS,
                     ensure_assets)
@@ -116,9 +117,13 @@ app.add_middleware(
 
 @app.middleware("http")
 async def simple_rate_limiter(request: Request, call_next):
+    # Only searches cost anything; page loads, the missing favicon and health checks shouldn't
+    # eat into a visitor's allowance.
+    if not request.url.path.startswith(("/search", "/similar")):
+        return await call_next(request)
     # Behind Railway's proxy request.client is the proxy; Railway puts the visitor in X-Real-IP.
     client_ip = request.headers.get("x-real-ip") or (request.client.host if request.client else "unknown")
-    now = asyncio.get_event_loop().time()
+    now = time.monotonic()
     window_start = now - RATE_LIMIT_WINDOW
 
     async with rate_limit_lock:
@@ -176,7 +181,6 @@ def search_image(
     leniency: float = Form(0.25),
     allowed: Optional[np.ndarray] = Depends(card_filter),
 ) -> Dict[str, List[Dict[str, Any]]]:
-    
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image.")
 
