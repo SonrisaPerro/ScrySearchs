@@ -45,7 +45,7 @@ First launch downloads the index (about 110 MB) and the CLIP model, so give it a
 
 ## Keeping the index up to date
 
-A GitHub Action runs every Monday. It grabs the current index, embeds whatever art Scryfall added that week, and if anything's new, publishes a release and bumps `index_version.txt`. That commit redeploys the site on its own.
+A GitHub Action runs every Monday. It grabs the current index, embeds whatever art Scryfall added that week, and if anything's new, publishes a release and bumps `index_version.txt`. That commit redeploys the site on its own. Only the newest four releases are kept; older ones get deleted.
 
 To run it early: **Actions → Refresh card index → Run workflow**. Or locally:
 
