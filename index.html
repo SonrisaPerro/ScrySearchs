@@ -13,23 +13,27 @@
     <meta name="twitter:card" content="summary_large_image">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23c0c0c0'/%3E%3Crect x='2' y='2' width='28' height='7' fill='%23000080'/%3E%3Crect x='2' y='11' width='28' height='19' fill='%23fff'/%3E%3Ccircle cx='14' cy='19' r='5' fill='none' stroke='%230066ff' stroke-width='3'/%3E%3Cpath d='M18 23l6 5' stroke='%230066ff' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Comfortaa:wght@700&display=swap');
-
+        /* One look throughout: a Windows 98 desktop. Sky wallpaper, grey bevelled windows, a taskbar.
+           Colour is saved for the title, the "go" buttons and links. */
         :root {
-            --surface-hover: #f0f8ff;
-            --text: #2c3e50;
+            --face: #c0c0c0;
+            --navy: #000080;
+            --text: #000000;
             --accent-blue: #0066ff;
             --accent-green: #00cc00;
             --accent-orange: #ff6600;
-            --accent-purple: #9933ff;
-            --shadow: rgba(0, 0, 0, 0.15);
-            --highlight: rgba(255, 255, 255, 0.6);
-            --border-hard: #0033cc;
+            --go: #0b8a0b;
+            --tip: #ffffe1;
+            /* The three bevels everything is built from */
+            --raised: inset -1px -1px #0a0a0a, inset 1px 1px #ffffff, inset -2px -2px #808080, inset 2px 2px #dfdfdf;
+            --pressed: inset -1px -1px #ffffff, inset 1px 1px #0a0a0a, inset -2px -2px #dfdfdf, inset 2px 2px #808080;
+            --sunken: inset -1px -1px #ffffff, inset 1px 1px #808080, inset -2px -2px #dfdfdf, inset 2px 2px #0a0a0a;
+            --ui-font: Tahoma, Verdana, Geneva, sans-serif;
+            --mono-font: 'Courier New', Courier, monospace;
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
+        [hidden] { display: none !important; }
 
         html {
             background: linear-gradient(180deg, #87ceeb 0%, #e0f6ff 50%, #b3e5fc 100%);
@@ -38,934 +42,384 @@
         }
 
         body {
-            font-family: 'Verdana', 'Fredoka', sans-serif;
-            background: transparent;
+            font-family: var(--ui-font);
+            font-size: 15px;
+            line-height: 1.4;
             color: var(--text);
             max-width: 1000px;
             margin: 0 auto;
-            padding: 2rem 1.5rem 5rem 1.5rem;
+            padding: 1.5rem 1.5rem 5.5rem;
             text-align: center;
             position: relative;
             overflow-x: hidden;
         }
 
-        /* Ironclad Z-Index Rule: Forces all main content above the background layer */
+        /* Keeps the page above the floating desktop windows */
         body > *:not(.bg-layer, .toast-container, .zoom-overlay, .achievements-modal, .app-footer) {
             position: relative;
             z-index: 10;
         }
 
         h1 {
-            font-family: 'Arial Black', 'Comfortaa', cursive;
-            font-size: clamp(2rem, 8vw, 3.5rem);
-            margin: 0;
-            margin-bottom: 0.5rem;
-            position: relative;
-            z-index: 2;
-            color: var(--accent-blue);
-            text-shadow:
-                2px 2px 0px #000,
-                -2px 0px 0px var(--accent-green),
-                2px -2px 0px var(--accent-orange);
-            letter-spacing: 0.02em;
+            font-family: 'Arial Black', 'Arial Bold', Gadget, sans-serif;
+            font-size: clamp(1.7rem, 7vw, 3.4rem);
             font-weight: 900;
-        }
-
-        body > p {
-            color: var(--text);
-            position: relative;
-            z-index: 2;
-            font-size: clamp(0.95rem, 3vw, 1.1rem);
-            letter-spacing: 0.01em;
-            font-weight: 500;
-        }
-
-        body > p::before,
-        body > p::after {
-            content: '✩';
-            margin: 0 8px;
+            line-height: 1.1;
+            letter-spacing: 0.02em;
+            text-wrap: balance;
+            margin: 0 0 0.5rem;
             color: var(--accent-blue);
-            opacity: 0.6;
+            text-shadow: 2px 2px 0 #000, -2px 0 0 var(--accent-green), 2px -2px 0 var(--accent-orange);
         }
 
-        /* Interactive Drag and Drop Zone */
-        .upload-container {
-            background: linear-gradient(135deg, #ffffff 0%, #e6f2ff 100%);
-            padding: clamp(1.5rem, 5vw, 2rem);
-            border: 4px solid var(--border-hard);
-            border-radius: 0px;
-            margin-bottom: 2rem;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            position: relative;
-            box-shadow:
-                4px 4px 0px rgba(0, 0, 0, 0.3),
-                inset 0 1px 0 var(--highlight);
-            overflow: hidden;
+        .tagline { margin: 0 auto 1.25rem; font-size: 16px; text-wrap: balance; }
+
+        :focus-visible { outline: 2px solid var(--navy); outline-offset: 1px; }
+
+        /* ============= WINDOWS ============= */
+        .window {
+            background: var(--face);
+            box-shadow: var(--raised), 4px 4px 0 rgba(0, 0, 0, 0.25);
+            padding: 3px;
+            margin-bottom: 1.25rem;
+            text-align: left;
         }
 
-        .upload-container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: repeating-linear-gradient(90deg, var(--accent-blue), var(--accent-blue) 10px, transparent 10px, transparent 20px);
-            opacity: 0.4;
-        }
-
-        .upload-container:hover {
-            border-color: var(--accent-green);
-            box-shadow:
-                6px 6px 0px rgba(0, 204, 0, 0.3),
-                inset 0 1px 0 var(--highlight);
-            background: #f9ffff;
-        }
-
-        .upload-container.drag-over {
-            border-color: var(--accent-orange);
-            background: #ffffcc;
-            box-shadow:
-                6px 6px 0px rgba(255, 102, 0, 0.4),
-                inset 0 1px 0 var(--highlight);
-        }
-
-        .upload-container h3 {
-            margin-top: 0;
-            color: var(--accent-blue);
-            position: relative;
-            z-index: 2;
-            font-weight: 700;
-            font-size: clamp(1.2rem, 4vw, 1.5rem);
-        }
-
-        .upload-container h3::before {
-            content: '▶';
-            margin-right: 8px;
-            color: var(--accent-green);
-            opacity: 0.7;
-        }
-
-        h3 {
-            font-family: 'Comfortaa', cursive;
-            color: var(--text);
-        }
-
-        h3::after {
-            content: '✦';
-            margin-left: 8px;
-            color: var(--accent-purple);
-            opacity: 0.6;
-        }
-
-        .upload-container p {
-            color: var(--text);
-            font-size: clamp(0.85rem, 2.5vw, 0.95rem);
-            margin-bottom: 1.5rem;
-            position: relative;
-            z-index: 2;
-        }
-
-        input[type="file"] { display: none; }
-
-        .upload-btn {
-            background: linear-gradient(180deg, #00b82e 0%, #008f1d 100%);
+        .title-bar, .achievements-header, .bg-window-header {
+            background: linear-gradient(90deg, var(--navy), #1084d0);
             color: #fff;
-            text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
-            padding: clamp(10px, 3vw, 12px) clamp(20px, 5vw, 28px);
-            border-radius: 25px;
-            cursor: pointer;
             font-weight: bold;
-            display: inline-block;
-            transition: all 0.3s;
-            border: none;
-            position: relative;
-            z-index: 2;
-            box-shadow:
-                0 6px 15px rgba(0, 170, 34, 0.3),
-                inset 0 1px 0 rgba(255, 255, 255, 0.5);
-            font-size: clamp(0.9rem, 2.5vw, 1rem);
-            font-family: 'Fredoka', sans-serif;
+            padding: 4px 4px 4px 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            text-align: left;
+        }
+
+        .window-body { padding: 12px; }
+
+        /* ============= BUTTONS ============= */
+        .btn, .buy-btn, .tabs button, .bg-window-close {
+            font-family: var(--ui-font);
+            font-size: 14px;
+            color: #000;
+            background: var(--face);
+            border: 0;
+            border-radius: 0;
+            box-shadow: var(--raised);
+            cursor: pointer;
             touch-action: manipulation;
         }
 
-        .upload-btn:hover {
-            box-shadow:
-                0 10px 25px rgba(0, 170, 34, 0.4),
-                inset 0 1px 0 rgba(255, 255, 255, 0.6);
-            transform: translateY(-2px);
+        .btn, .buy-btn {
+            display: inline-block;
+            min-height: 30px;
+            padding: 6px 14px;
+            text-align: center;
+            text-decoration: none;
         }
 
-        .upload-btn:active {
-            transform: translateY(0) rotate(0deg);
-        }
+        .btn:active, .buy-btn:active, .bg-window-close:active { box-shadow: var(--pressed); }
+        .btn:focus-visible, .buy-btn:focus-visible, .tabs button:focus-visible { outline: 1px dotted #000; outline-offset: -5px; }
+        .btn:disabled { color: #808080; text-shadow: 1px 1px #fff; cursor: not-allowed; }
 
-        /* Filtering Controls Styling */
-        .controls {
-            margin-top: 15px;
-            background: #ffffff;
-            padding: clamp(8px, 2vw, 12px);
-            border: 3px dashed var(--accent-blue);
-            border-radius: 0px;
-            display: flex;
-            flex-direction: column;
-            gap: clamp(10px, 3vw, 20px);
-            align-items: center;
-            justify-content: center;
-            font-size: clamp(0.75rem, 2vw, 0.85rem);
+        /* The one coloured button: whatever starts a search or a purchase */
+        .btn-go, .printing-buy { background: var(--go); color: #fff; font-weight: bold; }
+        .btn-go:disabled { background: var(--face); }
+
+        .bg-window-close { font-size: 11px; font-weight: bold; line-height: 1; padding: 3px 6px; }
+
+        /* ============= TABS: the three ways to search ============= */
+        .tabs { display: flex; padding: 0 4px; position: relative; z-index: 1; }
+        .tabs button {
+            padding: 6px 16px;
+            margin-top: 3px;
+            border-radius: 4px 4px 0 0;
+            box-shadow: inset 1px 1px #fff, inset -1px 0 #0a0a0a, inset 2px 2px #dfdfdf, inset -2px 0 #808080;
+        }
+        .tabs button[aria-selected="true"] {
+            font-weight: bold;
+            margin-top: 0;
+            margin-bottom: -2px;  /* covers the panel's top edge, so tab and panel read as one sheet */
+            padding-bottom: 11px;
             position: relative;
             z-index: 2;
-            transition: all 0.2s ease;
         }
 
-        .controls-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-        }
+        .tab-panel { box-shadow: var(--raised); padding: 14px; margin-bottom: 14px; text-align: center; }
+        .tab-panel p { margin: 0 0 12px; }
 
-        .controls-divider {
-            width: 90%;
-            border-top: 1px dashed var(--accent-blue);
-            opacity: 0.4;
-        }
-
-        .preset-btn {
-            background: var(--surface-hover);
-            border: 2px solid var(--accent-blue);
-            padding: 4px 10px;
-            font-family: 'Verdana', sans-serif;
-            font-size: 0.75rem;
-            cursor: pointer;
-            font-weight: bold;
-            color: var(--accent-blue);
-            transition: all 0.2s;
-        }
-
-        .preset-btn:hover {
-            background: var(--accent-blue);
-            color: #fff;
-        }
-
-        .controls:hover {
-            border-color: var(--accent-green);
-            background: #f9ffff;
-        }
-
-        .controls input[type="number"] {
-            width: 50px;
-            background: linear-gradient(180deg, #ffffff 0%, #f0f8ff 100%);
-            color: var(--accent-blue);
-            border: 2px solid var(--accent-blue);
-            border-radius: 12px;
-            padding: 6px;
-            text-align: center;
-            font-family: 'Fredoka', sans-serif;
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-
-        .controls input[type="checkbox"] {
-            accent-color: var(--accent-green);
-            width: 18px;
-            height: 18px;
+        .drop-zone {
+            background: #fff;
+            box-shadow: var(--sunken);
+            padding: 22px 16px;
             cursor: pointer;
         }
-
-        .controls label {
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            color: var(--text);
-            font-weight: 500;
-        }
+        .drop-zone.drag-over { background: var(--tip); outline: 2px dashed var(--navy); outline-offset: -8px; }
+        input[type="file"] { display: none; }
 
         #preview {
+            display: none;
             max-width: 200px;
             max-height: 200px;
-            margin: 15px auto 0;
-            border-radius: 15px;
-            display: none;
-            border: 3px solid var(--accent-blue);
-            position: relative;
-            z-index: 2;
-            box-shadow: 0 8px 20px var(--shadow);
+            margin: 14px auto 0;
+            box-shadow: var(--sunken);
+            padding: 3px;
+            background: var(--face);
+        }
+        #cropBtn { margin-top: 10px; }
+
+        .search-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+        .search-row input {
+            flex: 1 1 240px;
+            max-width: 480px;
+            min-height: 30px;
+            padding: 5px 8px;
+            font: 16px var(--ui-font);  /* 16px stops phones zooming in on focus */
+            border: 0;
+            border-radius: 0;
+            background: #fff;
+            box-shadow: var(--sunken);
         }
 
+        /* ============= FILTERS ============= */
+        .group {
+            border: 1px solid #808080;
+            box-shadow: 1px 1px #fff, inset 1px 1px #fff;
+            margin: 0;
+            padding: 6px 12px 12px;
+            min-width: 0;
+        }
+        .group legend { padding: 0 4px; font-weight: bold; }
+        .group-note { margin: 0 0 10px; }
+
+        .controls-row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 10px; }
+        .controls-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+        .filter-label { font-weight: bold; }
+        .toggle-row { display: flex; flex-wrap: wrap; gap: 4px; }
+
+        .mana-row { display: flex; gap: 4px; }
+        .mana-btn {
+            width: 34px; height: 34px; padding: 5px; cursor: pointer;
+            border: 0; background: var(--face); box-shadow: var(--raised);
+        }
+        .mana-btn img { width: 100%; height: 100%; display: block; filter: grayscale(1); opacity: 0.55; }
+        .mana-btn[aria-pressed="true"] { background: #fff; box-shadow: var(--pressed); }
+        .mana-btn[aria-pressed="true"] img { filter: none; opacity: 1; }
+        .mana-colorless { margin-left: 8px; }
+
+        .type-btn[aria-pressed="true"], .preset-btn[aria-pressed="true"] { background: #fff; box-shadow: var(--pressed); font-weight: bold; }
+
+        .controls-row select, .controls-row input[type="number"] {
+            font: inherit; min-height: 26px; padding: 2px 4px;
+            border: 0; border-radius: 0; background: #fff; box-shadow: var(--sunken);
+        }
+        .controls-row input[type="number"] { width: 52px; text-align: center; }
+        .controls-row input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--navy); cursor: pointer; }
+        .controls-row input[type="range"] { width: 140px; accent-color: var(--navy); }
+        #leniencyValue { font-family: var(--mono-font); font-weight: bold; }
+
+        /* ============= RESULTS ============= */
+        #resultsWindow .window-body { background: #fff; box-shadow: var(--sunken); margin: 3px 0 0; min-height: 120px; }
+
+        /* A progress bar in place of a spinner */
         .loader {
             display: none;
-            margin: 20px auto;
-            border: 4px solid rgba(0, 153, 255, 0.2);
-            border-top: 4px solid var(--accent-blue);
-            border-right: 4px solid var(--accent-green);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin-smooth 1s linear infinite;
-            box-shadow: 0 0 10px rgba(0, 153, 255, 0.3);
+            width: min(280px, 90%);
+            height: 22px;
+            margin: 30px auto;
+            padding: 4px;
+            background: #fff;
+            box-shadow: var(--sunken);
         }
-
-        @keyframes spin-smooth {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        #results {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 16px;
-            margin-top: 20px;
-            position: relative;
-            z-index: 2;
-        }
-
-        .card {
-            background: #ffffff;
-            padding: 0;
-            border: 3px solid var(--border-hard);
-            border-radius: 0px;
-            display: flex;
-            flex-direction: column;
-            align-items: stretch;
-            position: relative;
-            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.25);
-            transition: all 0.2s ease;
-            overflow: hidden;
-        }
-
-        .card::before {
+        .loader::before {
             content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: repeating-linear-gradient(90deg, var(--accent-blue), var(--accent-blue) 6px, var(--accent-green) 6px, var(--accent-green) 12px);
-            z-index: 10;
-        }
-
-        .card:hover {
-            border-color: var(--accent-green);
-            box-shadow: 6px 6px 0px rgba(0, 204, 0, 0.4);
-            transform: translateY(-4px);
-            background: #f9ffff;
-        }
-
-        .card:hover img {
-            border-bottom-color: var(--accent-orange);
-        }
-
-        .card img {
-            width: 100%;
-            height: auto;
             display: block;
-            border-bottom: 3px solid var(--accent-blue);
-            cursor: zoom-in;
-            transition: all 0.2s ease;
-            background: #f0f0f0;
+            height: 100%;
+            background: repeating-linear-gradient(90deg, var(--navy) 0 10px, transparent 10px 13px);
+            animation: load 1.6s steps(20, end) infinite;
+        }
+        @keyframes load { from { width: 0; } to { width: 100%; } }
+
+        #results { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 12px; text-align: center; }
+
+        .results-heading {
+            grid-column: 1 / -1; margin: 0; padding: 6px 10px; text-align: left; font-weight: bold;
+            background: var(--tip); border: 1px solid #000;
         }
 
-        .card img:hover {
-            filter: brightness(1.1);
-            border-bottom-color: var(--accent-green);
-        }
+        .card { background: var(--face); box-shadow: var(--raised); padding: 4px; display: flex; flex-direction: column; }
+        .card img { width: 100%; height: auto; display: block; cursor: zoom-in; background: #808080; border-radius: 4.75% / 3.5%; }
+        .card > div:not([class]) { padding: 8px 4px 4px; display: flex; flex-direction: column; flex-grow: 1; }
+        .card strong { margin-bottom: 2px; }
 
-        .card > div:not([class]) {
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            flex-grow: 1;
-        }
-
-        .card strong {
-            font-size: clamp(0.8rem, 2.5vw, 0.95rem);
-            color: var(--text);
-            margin-bottom: 6px;
-            text-align: center;
-            font-family: 'Verdana', sans-serif;
-            font-weight: bold;
-        }
-
-        .artist-credit {
-            font-size: clamp(0.6rem, 2vw, 0.7rem);
-            color: var(--accent-blue);
-            text-decoration: none;
-            margin-bottom: 6px;
-        }
-
-        .artist-credit:hover { text-decoration: underline; }
+        .artist-credit { font-size: 12px; color: #0000ee; margin-bottom: 6px; }
 
         .score {
-            font-size: clamp(0.65rem, 2vw, 0.75rem);
-            color: #006b00;  /* the bright accent green is unreadable as small text on grey */
-            margin-bottom: 8px;
-            font-weight: bold;
-            font-family: 'Courier New', monospace;
-            background: #f0f0f0;
-            padding: 4px 6px;
-            border: 1px solid var(--accent-green);
-            border-radius: 0px;
+            font-family: var(--mono-font); font-size: 12px; font-weight: bold;
+            background: #fff; box-shadow: var(--sunken); padding: 4px 6px; margin-bottom: 8px;
         }
 
         .badge {
-            background: var(--accent-orange);
-            color: #fff;
-            font-size: 0.65rem;
-            padding: 4px 8px;
-            border: none;
-            margin-bottom: 6px;
-            font-weight: bold;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            border-radius: 0px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            align-self: center;
+            align-self: center; margin-bottom: 6px; padding: 2px 8px;
+            background: #800000; color: #fff; font-size: 11px; font-weight: bold;
         }
 
-        /* TCGplayer Button Styles */
-        .buy-btn {
-            background: var(--accent-green);
-            color: #003300;  /* white on this green is too faint to read */
-            text-decoration: none;
-            padding: 8px 12px;
-            border: 2px solid #003300;
-            font-size: clamp(0.65rem, 2.5vw, 0.8rem);
-            font-weight: bold;
-            margin-top: auto;
-            transition: all 0.15s ease;
-            display: block;
-            border-radius: 0px;
-            font-family: 'Verdana', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            cursor: pointer;
-        }
-
-        .buy-btn:hover {
-            background: #00ff00;
-            color: #000;
-            border-color: #000;
-            transform: translateY(-1px);
-            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
-        }
-
-        /* Card Overlay Styles - Upgraded to Floating Inspector */
-        .zoom-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(180deg, rgba(135, 206, 235, 0.95), rgba(224, 246, 255, 0.95));
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            cursor: zoom-out;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            backdrop-filter: blur(5px);
-        }
-
-        .zoom-overlay.active {
-            display: flex;
-            opacity: 1;
-        }
-
-        .zoom-card-container {
-            position: relative;
-            max-width: 90%;
-            max-height: 90%;
-            animation: zoom-in-bounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .inspector-name {
-            background: #000;
-            color: #fff;
-            padding: 8px 16px;
-            font-family: 'Verdana', sans-serif;
-            font-weight: bold;
-            font-size: 1.2rem;
-            margin-bottom: -15px;
-            z-index: 1001;
-            border: 3px solid #fff;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            border-radius: 4px;
-        }
-
-        .inspector-score {
-            background: var(--accent-green);
-            color: #fff;
-            padding: 6px 12px;
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            font-size: 1rem;
-            margin-top: -15px;
-            z-index: 1001;
-            border: 3px solid #fff;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            border-radius: 4px;
-        }
-
-        @keyframes zoom-in-bounce {
-            from { transform: scale(0.7) rotate(-5deg); opacity: 0; }
-            to { transform: scale(1) rotate(0deg); opacity: 1; }
-        }
-
-        .zoom-overlay img {
-            max-width: 100%;
-            max-height: 70vh;
-            border-radius: 15px;
-            box-shadow:
-                0 15px 50px rgba(0, 0, 0, 0.3),
-                inset 0 1px 0 rgba(255, 255, 255, 0.5);
-            display: block;
-            border: 4px solid #ffffff;
-        }
-
-        .flip-btn {
-            display: none;
-            position: absolute;
-            bottom: 30px;
-            right: -20px;
-            background: linear-gradient(180deg, var(--accent-blue), #0066ff);
-            color: #fff;
-            border: 2px solid #fff;
-            border-radius: 15px;
-            padding: 8px 14px;
-            cursor: pointer;
-            font-size: clamp(0.7rem, 2vw, 0.8rem);
-            z-index: 1001;
-            font-weight: bold;
-            box-shadow: 0 4px 12px rgba(0, 102, 255, 0.4);
-            transition: all 0.2s;
-            font-family: 'Fredoka', sans-serif;
-            touch-action: manipulation;
-        }
-
-        .flip-btn:hover {
-            box-shadow: 0 6px 18px rgba(0, 102, 255, 0.5);
-            transform: scale(1.05);
-        }
-
-        .is-double-faced .flip-btn { display: block; }
-
-        /* ============= ACHIEVEMENTS & TOAST UI ============= */
-        .stats-tracker {
-            margin: 0 auto 12px; width: max-content; background: #ffffff;
-            padding: 8px 12px; border: 2px solid var(--border-hard);
-            box-shadow: 4px 4px 0px rgba(0,0,0,0.2); font-weight: bold;
-            font-family: 'Courier New', monospace; z-index: 100;
-        }
-
-        .achievements-modal {
-            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 400px; max-width: 90%; max-height: 80vh; overflow-y: auto;
-            background: #c0c0c0; border-top: 2px solid #fff; border-left: 2px solid #fff;
-            border-bottom: 2px solid #000; border-right: 2px solid #000;
-            z-index: 3000; box-shadow: 10px 10px 0 rgba(0,0,0,0.5); font-family: 'Tahoma', sans-serif;
-        }
-
-        .achievements-header {
-            background: darkblue; color: white; padding: 5px 10px; font-weight: bold;
-            display: flex; justify-content: space-between; align-items: center;
-        }
-
-        .achievements-header .bg-window-close { font-size: 13px; padding: 1px 6px; }
-
-        .achievement-list { padding: 10px; background: #fff; border: 2px inset #fff; margin: 5px; }
-        .achievement-item {
-            display: flex; align-items: center; padding: 10px; border-bottom: 1px dashed #ccc;
-            opacity: 0.5; filter: grayscale(100%);
-        }
-        .achievement-item.unlocked { opacity: 1; filter: grayscale(0%); background: #f0f8ff; }
-        .ach-icon { font-size: 1.5rem; margin-right: 10px; }
-        .ach-details h4 { margin: 0 0 5px 0; color: darkblue; text-align: left; }
-        .ach-details p { margin: 0; font-size: 0.8rem; color: #333; text-align: left; }
-
-        /* More like this: same chunky button, blue instead of green */
-        .buy-btn { width: 100%; }
+        .buy-btn { width: 100%; margin-top: auto; }
         .buy-btn + .buy-btn { margin-top: 6px; }
-        .alt-btn { background: var(--accent-blue); border-color: var(--border-hard); color: #fff; }
-        .alt-btn:hover { background: #33ccff; }
-
-        .text-search-box, .filters-box { cursor: default; }
-        /* The two typed searches sit side by side so the filters and results aren't a long scroll away */
-        .search-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
-        .search-pair .upload-container { margin-bottom: 0; }
-        .filters-box .controls { margin-top: 0; }
-        .filter-label { font-weight: bold; }
-        .mana-row { display: flex; gap: 6px; }
-        .mana-btn {
-            width: 34px; height: 34px; padding: 3px; border-radius: 50%; cursor: pointer;
-            background: #fff; border: 2px solid #999; filter: grayscale(1); opacity: 0.45; transition: all 0.15s;
-        }
-        .mana-btn img { width: 100%; height: 100%; display: block; }
-        .mana-btn:hover { opacity: 0.8; }
-        .mana-btn[aria-pressed="true"] {
-            filter: none; opacity: 1; border-color: var(--accent-orange);
-            box-shadow: 0 0 0 2px #ffffcc, 2px 2px 0 rgba(0, 0, 0, 0.3);
-        }
-        .mana-colorless { margin-left: 8px; }
-        .type-btn[aria-pressed="true"] { background: var(--accent-blue); color: #fff; }
-        #formatFilter { font-family: inherit; font-weight: bold; color: var(--accent-blue); border: 2px solid var(--accent-blue); padding: 3px; }
-        .text-search-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 2; }
-        .text-search-row input {
-            flex: 1 1 260px; max-width: 460px; padding: 10px;
-            border: 3px solid var(--accent-blue); font-family: inherit; font-weight: bold; font-size: 1rem;
-        }
-        .text-search-row input:focus { outline: none; border-color: var(--accent-green); }
-
-        .results-heading {
-            grid-column: 1 / -1; margin: 0; padding: 8px 12px; text-align: center; font-weight: bold;
-            background: #ffffff; border: 3px dashed var(--accent-blue); color: var(--accent-blue);
-        }
-
-        .printings-modal { width: 520px; }
-        .printing-row {
-            display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px dashed #ccc; text-align: left;
-        }
-        .printing-info { flex: 1; display: flex; flex-direction: column; font-size: 0.8rem; }
-        .printing-info strong { color: darkblue; }
-        .printing-prices { font-family: 'Courier New', monospace; font-weight: bold; font-size: 0.8rem; white-space: nowrap; }
-        .printing-buy { width: auto; margin: 0; padding: 4px 10px; }
-        .printings-note { display: block; margin: 10px 4px 2px; font-size: 0.8rem; text-align: center; }
 
         /* Which result the open printings window belongs to */
-        .card.is-active, .card.is-active:hover {
-            border-color: var(--accent-orange);
-            box-shadow: 6px 6px 0px rgba(255, 102, 0, 0.45);
-            background: #fffbe6;
-        }
-        .buy-btn.is-active, .buy-btn.is-active:hover {
-            background: #ffffcc; color: #003300; border-color: var(--accent-orange);
-            box-shadow: inset 2px 2px 0px rgba(0, 0, 0, 0.25); transform: none;
-        }
-        .printings-source {
-            display: flex; align-items: center; gap: 10px; margin: 5px 5px 0; padding: 6px;
-            background: #fff; border: 2px inset #fff; font-size: 0.8rem; text-align: left;
-        }
-        .printings-source img { width: 96px; height: auto; border: 2px solid var(--accent-orange); }
-        .printings-source:empty { display: none; }
+        .card.is-active { background: var(--tip); outline: 1px dotted #000; outline-offset: 2px; }
+        .buy-btn.is-active { background: #fff; box-shadow: var(--pressed); font-weight: bold; }
 
-        /* Optional crop before searching */
-        .crop-btn { margin-top: 10px; }
-        .crop-modal { width: 640px; max-width: 94vw; max-height: 94vh; }
-        .crop-hint { margin: 4px 4px 10px; font-size: 0.85rem; text-align: center; }
+        /* ============= DIALOGS (achievements, printings, crop) ============= */
+        .achievements-modal {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 400px; max-width: 94vw; max-height: 84vh; overflow-y: auto;
+            background: var(--face); padding: 3px; z-index: 3000; text-align: left;
+            box-shadow: var(--raised), 8px 8px 0 rgba(0, 0, 0, 0.4);
+        }
+        .achievement-list { padding: 10px; margin-top: 3px; background: #fff; box-shadow: var(--sunken); }
+        .achievement-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px dotted #808080; opacity: 0.5; filter: grayscale(100%); }
+        .achievement-item.unlocked { opacity: 1; filter: none; }
+        .ach-icon { font-size: 1.5rem; margin-right: 10px; }
+        .ach-details h4 { margin: 0 0 4px; color: var(--navy); font-size: 14px; }
+        .ach-details p { margin: 0; font-size: 12px; }
+
+        .printings-modal { width: 520px; }
+        .printings-source { display: flex; align-items: center; gap: 10px; margin-top: 3px; padding: 8px; font-size: 12px; }
+        .printings-source img { width: 96px; height: auto; box-shadow: var(--sunken); padding: 2px; }
+        .printings-source:empty { display: none; }
+        .printing-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px dotted #808080; }
+        .printing-info { flex: 1; display: flex; flex-direction: column; font-size: 12px; }
+        .printing-info strong { color: var(--navy); font-size: 13px; }
+        .printing-prices { font-family: var(--mono-font); font-weight: bold; font-size: 12px; white-space: nowrap; }
+        .printing-buy { width: auto; margin: 0; min-height: 26px; padding: 4px 12px; }
+        .printings-note { display: block; margin: 10px 4px 2px; font-size: 12px; text-align: center; color: #0000ee; }
+        p.printings-note { color: #000; }
+
+        .crop-modal { width: 640px; }
+        .crop-modal .achievement-list { text-align: center; }
+        .crop-hint { margin: 0 0 10px; }
         .crop-stage {
             position: relative; display: inline-block; max-width: 100%; line-height: 0;
-            cursor: crosshair; touch-action: none; user-select: none; border: 2px solid var(--accent-blue);
+            cursor: crosshair; touch-action: none; user-select: none; border: 1px solid #000;
         }
-        .crop-stage img { max-width: 100%; max-height: 60vh; display: block; }
+        .crop-stage img { max-width: 100%; max-height: 56vh; display: block; }
         .crop-box {
             position: absolute; border: 2px dashed var(--accent-orange);
             box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);  /* dims everything outside the box */
             pointer-events: none;
         }
-        .crop-modal .achievement-list { text-align: center; }
-        .crop-actions { display: flex; gap: 10px; justify-content: center; align-items: center; margin-top: 12px; line-height: normal; }
-        .crop-actions .upload-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+        .crop-actions { display: flex; gap: 8px; justify-content: center; margin-top: 12px; line-height: normal; }
 
+        /* ============= CARD VIEWER ============= */
+        .zoom-overlay {
+            display: none; position: fixed; inset: 0; z-index: 1000;
+            align-items: center; justify-content: center;
+            background: rgba(0, 0, 0, 0.55); cursor: zoom-out;
+        }
+        .zoom-overlay.active { display: flex; }
+        .zoom-card-container {
+            max-width: 94vw; max-height: 94vh; display: flex; flex-direction: column;
+            background: var(--face); padding: 3px; cursor: default; text-align: left;
+            box-shadow: var(--raised), 8px 8px 0 rgba(0, 0, 0, 0.4);
+        }
+        .zoom-overlay img {
+            display: block; max-width: 100%; max-height: 72vh; margin: 8px; align-self: center;
+            border-radius: 4.75% / 3.5%; cursor: zoom-out;
+        }
+        .zoom-footer { display: flex; align-items: center; gap: 6px; }
+        .inspector-score { flex: 1; font-family: var(--mono-font); font-weight: bold; padding: 5px 8px; box-shadow: var(--sunken); }
+        .flip-btn { display: none; }
+        .is-double-faced .flip-btn { display: inline-block; }
+
+        /* ============= ACHIEVEMENT BALLOON ============= */
         .toast-container {
-            position: fixed; bottom: 20px; right: 20px; z-index: 4000;
-            display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+            position: fixed; bottom: 64px; right: 16px; z-index: 4000;
+            display: flex; flex-direction: column; gap: 8px; pointer-events: none;
         }
         .retro-toast {
-            background: #fff; border: 3px solid var(--accent-orange); padding: 10px 15px;
-            box-shadow: 4px 4px 0 #000; font-family: 'Courier New', monospace; font-weight: bold;
-            animation: slideIn 0.3s ease-out forwards, fadeOut 0.5s ease-in 4.5s forwards;
-            text-align: left;
+            background: var(--tip); border: 1px solid #000; padding: 8px 12px; text-align: left;
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
+            animation: fadeOut 0.5s ease-in 4.5s forwards;
         }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fadeOut { to { opacity: 0; } }
 
-        /* Donation Footer Styles */
+        /* ============= TASKBAR ============= */
         .app-footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background: #ffffff;
-            border-top: 4px solid var(--border-hard);
-            padding: clamp(8px, 2vw, 12px) 1rem;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: clamp(10px, 2vw, 15px);
-            font-size: clamp(0.7rem, 2.5vw, 0.85rem);
-            z-index: 999;
-            box-shadow: 0 -4px 0px rgba(0, 0, 0, 0.2);
-            flex-wrap: wrap;
-            transition: all 0.2s ease;
-            font-family: 'Verdana', sans-serif;
-        }
-
-        .app-footer::before {
-            content: '';
-            position: absolute;
-            bottom: 100%;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: repeating-linear-gradient(90deg, var(--accent-blue), var(--accent-blue) 10px, transparent 10px, transparent 20px);
-            opacity: 0.6;
-        }
-
-        .app-footer p {
-            margin: 0;
-            color: var(--text);
-            font-weight: bold;
-            letter-spacing: 0.5px;
-        }
-
-        .donate-link {
-            background: var(--accent-orange);
-            color: #fff;
-            text-decoration: none;
-            padding: clamp(6px, 2vw, 8px) clamp(12px, 3vw, 16px);
-            border: 2px solid #663300;
-            font-weight: bold;
-            transition: all 0.15s ease;
-            border-radius: 0px;
-            font-family: 'Verdana', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-size: clamp(0.65rem, 2.5vw, 0.8rem);
-            touch-action: manipulation;
-        }
-
-        .donate-link:hover {
-            background: #ff9900;
-            color: #000;
-            border-color: #000;
-            transform: translateY(-1px);
-            box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
-        }
-
-        /* ============= REACTIVE BACKGROUND WINDOWS ============= */
-        .bg-layer {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            pointer-events: none;
-            z-index: 0;
-            overflow: hidden;
-        }
-
-        .bg-window {
-            position: absolute;
-            background: #c0c0c0;
-            border: 2px solid;
-            border-color: #ffffff #808080 #808080 #ffffff;
-            pointer-events: auto;
-            box-shadow: 4px 4px 0px rgba(0,0,0,0.2);
-            display: flex;
-            flex-direction: column;
-            transition: transform 0.1s ease-out;
-        }
-
-        .bg-window-header {
-            background: linear-gradient(90deg, darkblue, #1084d0);
-            color: white;
-            padding: 3px 6px;
-            font-family: 'Tahoma', sans-serif;
-            font-size: 12px;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: default;
-        }
-
-        .bg-window-close {
-            background: #c0c0c0;
-            color: black;
-            border: 2px solid;
-            border-color: #ffffff #808080 #808080 #ffffff;
-            font-size: 10px;
-            padding: 0 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        .bg-window-close:active {
-            border-color: #808080 #ffffff #ffffff #808080;
-        }
-
-        .bg-window-content {
-            padding: 5px;
-            background: #fff;
-            border: 2px solid;
-            border-color: #808080 #ffffff #ffffff #808080;
-            margin: 4px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        /* Contact Tab Styles */
-        .contact-tab .contact-card {
-            width: 100%;
-            color: #08233a;
-            font-family: 'Verdana', sans-serif;
+            position: fixed; bottom: 0; left: 0; width: 100%; z-index: 999;
+            display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap;
+            padding: 4px 6px;
+            background: var(--face);
+            box-shadow: inset 0 1px #dfdfdf, inset 0 2px #fff;
             text-align: left;
         }
+        .app-footer p { margin: 0; flex: 1 1 auto; }
+        .start-btn { font-weight: bold; }
+        .tray { padding: 6px 10px; box-shadow: var(--sunken); font-family: var(--mono-font); font-weight: bold; white-space: nowrap; }
 
-        .contact-tab .contact-card h4 {
-            margin: 0 0 6px 0;
-            font-size: 1rem;
-            color: var(--accent-blue);
-            font-weight: 800;
+        /* ============= DESKTOP CLUTTER: the floating windows behind the page ============= */
+        .bg-layer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 0; overflow: hidden; }
+        .bg-window {
+            position: absolute; background: var(--face); padding: 3px; pointer-events: auto;
+            box-shadow: var(--raised), 4px 4px 0 rgba(0, 0, 0, 0.2);
+            display: flex; flex-direction: column; transition: transform 0.1s ease-out; font-size: 12px;
+        }
+        .bg-window-header { cursor: default; }
+        .bg-window-content {
+            padding: 5px; margin-top: 3px; background: #fff; box-shadow: var(--sunken);
+            display: flex; justify-content: center; align-items: center;
         }
 
-        .contact-tab .contact-card .contact-body {
-            font-size: 0.85rem;
-            line-height: 1.25;
-            padding: 6px 0;
-        }
+        .contact-card { width: 100%; text-align: left; }
+        .contact-card h4 { margin: 0 0 6px; font-size: 14px; color: var(--navy); }
+        .contact-card p { margin: 0 0 8px; }
 
-        .contact-tab .btn {
-            background: var(--accent-orange);
-            color: #000;
-            padding: 6px 8px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            border: 2px solid rgba(0,0,0,0.08);
-        }
-
-        /* Floating Animations */
-        /* float1 stays near the edge: the Contact window is wide and used to slide under the page column */
+        /* float1 stays near the edge: the Contact window is wide and would slide under the page column */
         @keyframes float1 { 0% { top: 5%; left: 1%; } 100% { top: 15%; left: 3%; } }
         @keyframes float2 { 0% { bottom: 15%; right: 5%; } 100% { bottom: 25%; right: 15%; } }
         @keyframes float3 { 0% { top: 40%; right: 8%; } 100% { top: 30%; right: 12%; } }
-
         .win-1 { animation: float1 20s infinite alternate ease-in-out; }
         .win-2 { animation: float2 25s infinite alternate ease-in-out; }
         .win-3 { animation: float3 18s infinite alternate ease-in-out; }
 
         @media (prefers-reduced-motion: reduce) {
             .bg-window { animation: none; transition: none; }
+            .loader::before { animation: none; width: 100%; }
         }
 
-        /* ============= MOBILE RESPONSIVENESS ============= */
+        /* ============= PHONES ============= */
         @media (max-width: 768px) {
-            .bg-layer {
-                display: none;
-            }
-            .search-pair { grid-template-columns: 1fr; }
-            body {
-                padding: 1.5rem 0.75rem 5.5rem 0.75rem;
-            }
-            h1 {
-                font-size: clamp(1.5rem, 6vw, 2.2rem);
-            }
-            #results {
-                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-                gap: 12px;
-                margin-top: 15px;
-            }
-            .card {
-                border-width: 2px;
-            }
-            .card::before {
-                height: 2px;
-            }
-            .card:hover {
-                transform: translateY(-2px);
-                box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.25);
-            }
+            .bg-layer { display: none; }
+            body { padding: 1rem 0.5rem 6.5rem; }
+            h1 { text-shadow: 1px 1px 0 #000, -1px 0 0 var(--accent-green), 1px -1px 0 var(--accent-orange); }
+            .window-body { padding: 8px; }
+            .tabs button { flex: 1; padding-left: 6px; padding-right: 6px; }
+            .btn, .buy-btn, .tabs button, .search-row input { min-height: 40px; }
+            .tabs button[aria-selected="true"] { padding-bottom: 11px; }
+            .mana-btn { width: 40px; height: 40px; }
+            .search-row .btn { flex: 1 1 100%; }
+            .drop-zone .btn { display: block; }
+            /* Taskbar in two rows: the note and scan count, then the two buttons */
+            .app-footer p { order: -2; }
+            .tray { order: -1; }
+            .app-footer .btn { flex: 1 1 40%; }
         }
 
-        @media (max-width: 600px) {
-            body {
-                padding: 1rem 0.5rem 5.5rem 0.5rem;
-            }
-            h1 {
-                /* Two balanced lines read better on a phone than one tiny smudged one */
-                font-size: clamp(1.6rem, 7vw, 2rem);
-                text-wrap: balance;
-                text-shadow: 1px 1px 0px #000, -1px 0px 0px var(--accent-green), 1px -1px 0px var(--accent-orange);
-                margin-bottom: 0.3rem;
-            }
-            .upload-container {
-                border-width: 3px;
-                padding: 1rem;
-                margin-bottom: 1rem;
-            }
-            .controls-row {
-                flex-direction: column;
-                gap: 8px;
-            }
-            #typeFilter { flex-direction: row; flex-wrap: wrap; gap: 6px; }
-            #typeFilter .filter-label { width: 100%; }
-            #results {
-                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-                gap: 10px;
-                margin-top: 10px;
-            }
-            .card {
-                border-width: 2px;
-                padding: 0;
-            }
-            .card strong {
-                font-size: 0.7rem;
-            }
-            .score {
-                font-size: 0.6rem;
-            }
-            .upload-btn {
-                width: 100%;
-                padding: 10px 14px;
-                font-size: 0.8rem;
-            }
-        }
-
-        @media (max-width: 400px) {
-            body {
-                padding: 0.75rem 0.5rem 5.5rem 0.5rem;
-            }
-            .upload-container {
-                border: 3px solid var(--border-hard);
-                padding: 0.75rem;
-            }
-            #results {
-                grid-template-columns: repeat(2, 1fr);  /* one giant card per row made ten results a very long scroll */
-                gap: 8px;
-            }
-            .app-footer {
-                padding: 8px 0.5rem;
-                gap: 6px;
-            }
+        @media (max-width: 480px) {
+            #results { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .buy-btn { padding: 6px 4px; font-size: 12px; }            .printing-row { flex-wrap: wrap; }
         }
     </style>
 </head>
 <body>
 
-    <div class="stats-tracker">
-        Scans: <span id="scan-count-display">0</span>
-        <button onclick="document.getElementById('achievementsModal').style.display='block'" style="display:block; margin-top:5px; width:100%; background:var(--accent-blue); color:white; border:1px solid #000; cursor:pointer; font-family:inherit;">View Achievements</button>
-    </div>
-
-    <div id="achievementsModal" class="achievements-modal">
+    <div id="achievementsModal" class="achievements-modal" role="dialog" aria-label="Achievements">
         <div class="achievements-header">
-            <span>🏅 Player Unlocks</span>
-            <button onclick="document.getElementById('achievementsModal').style.display='none'" class="bg-window-close" aria-label="Close">X</button>
+            <span>🏅 Achievements</span>
+            <button class="bg-window-close" aria-label="Close" onclick="document.getElementById('achievementsModal').style.display='none'">X</button>
         </div>
         <div class="achievement-list" id="achievementListUI"></div>
     </div>
@@ -973,7 +427,7 @@
     <div id="cropModal" class="achievements-modal crop-modal" role="dialog" aria-label="Crop your image">
         <div class="achievements-header">
             <span>Crop your image</span>
-            <button onclick="closeCrop()" class="bg-window-close" aria-label="Close">X</button>
+            <button class="bg-window-close" aria-label="Close" onclick="closeCrop()">X</button>
         </div>
         <div class="achievement-list">
             <p class="crop-hint">Drag a box around <strong>just the artwork</strong>. Leave out the card's name and text box, and anything behind the card.</p>
@@ -982,16 +436,16 @@
                 <div class="crop-box" id="cropBox" hidden></div>
             </div>
             <div class="crop-actions">
-                <button type="button" class="upload-btn" id="cropSearchBtn" disabled>Search this area</button>
-                <button type="button" class="preset-btn" onclick="closeCrop()">Cancel</button>
+                <button type="button" class="btn btn-go" id="cropSearchBtn" disabled>Search this area</button>
+                <button type="button" class="btn" onclick="closeCrop()">Cancel</button>
             </div>
         </div>
     </div>
 
-    <div id="printingsModal" class="achievements-modal printings-modal">
+    <div id="printingsModal" class="achievements-modal printings-modal" role="dialog" aria-labelledby="printingsTitle">
         <div class="achievements-header">
             <span id="printingsTitle">Printings</span>
-            <button onclick="closePrintings()" class="bg-window-close" aria-label="Close">X</button>
+            <button class="bg-window-close" aria-label="Close" onclick="closePrintings()">X</button>
         </div>
         <div class="printings-source" id="printingsSource"></div>
         <div class="achievement-list" id="printingsList"></div>
@@ -1000,162 +454,175 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <div class="bg-layer" id="bgLayer">
-        <div class="bg-window win-1 contact-tab" style="top: 8%; left: 2%; width: 320px; height: auto;">
+        <div class="bg-window win-1 contact-tab" style="top: 8%; left: 2%; width: 300px;">
             <div class="bg-window-header">
-                <span>✉ CONTACT</span>
+                <span>✉ Contact</span>
                 <button class="bg-window-close" aria-label="Close" onclick="this.closest('.bg-window').style.display='none'">X</button>
             </div>
             <div class="bg-window-content">
                 <div class="contact-card">
-                    <h4>Contact Me</h4>
-                    <div class="contact-body">
-                        <div style="padding:6px; border:1px dashed #ccc; background:#f9f9f9; font-size:0.85rem;">
-                            Business Inquiries? Feedback? Just want to say hi? Drop me a line!
-                        </div>
-                        <div style="margin-top:8px; display:flex; gap:8px;">
-                            <a class="btn" href="mailto:darkstartx@gmail.com?subject=MTG%20Search%20Inquiry">Email Me</a>
-                        </div>
-                    </div>
+                    <h4>Contact me</h4>
+                    <p>Business inquiries? Feedback? Just want to say hi? Drop me a line.</p>
+                    <a class="btn" href="mailto:darkstartx@gmail.com?subject=MTG%20Search%20Inquiry">Email me</a>
                 </div>
             </div>
         </div>
 
-        <div class="bg-window win-2" style="bottom: 12%; right: 2%; width: 260px; height: 140px;">
+        <div class="bg-window win-2" style="bottom: 12%; right: 2%; width: 260px;">
             <div class="bg-window-header">
                 <span>🔮 mana_generator.bat</span>
                 <button class="bg-window-close" aria-label="Close" onclick="this.closest('.bg-window').style.display='none'">X</button>
             </div>
-            <div class="bg-window-content" style="background: #000; color: #fff; font-family: 'Courier New', monospace; font-size: 18px; padding: 12px; letter-spacing: 2px;">
+            <div class="bg-window-content" style="background: #000; color: #fff; font-family: 'Courier New', monospace; font-size: 18px; padding: 12px; letter-spacing: 2px; min-height: 70px;">
                 <span id="manaScrambler">{W} {U} {B} {R} {G}</span>
             </div>
         </div>
 
-        <div class="bg-window win-3" style="top: 25%; right: 2%; width: 200px; height: 200px;">
+        <div class="bg-window win-3" style="top: 25%; right: 2%; width: 200px;">
             <div class="bg-window-header">
-                <span>⚠️ SPONSOR</span>
+                <span>⚠️ Sponsor</span>
                 <button class="bg-window-close" aria-label="Close" onclick="this.closest('.bg-window').style.display='none'">X</button>
             </div>
-            <div class="bg-window-content" style="padding: 0; margin: 4px;">
-                <img id="retroAd" src="https://media.giphy.com/media/13HgwGsXF0aiGY/200h.webp" width="180" height="180" alt="" style="object-fit: cover;">
+            <div class="bg-window-content" style="padding: 0;">
+                <img id="retroAd" src="https://media.giphy.com/media/13HgwGsXF0aiGY/200h.webp" width="190" height="180" alt="" style="object-fit: cover;">
             </div>
         </div>
     </div>
 
     <h1>MTG Reverse Image Search</h1>
-    <p>Upload artwork, a photo, or even a sketch to find the closest matching Magic cards.</p>
+    <p class="tagline">Find a Magic card from its art. Use a picture, a description, or a card you already know.</p>
 
-    <div class="upload-container" id="dropZone">
-        <h3>1. Search with an Image</h3>
-        <p>Drag an image here OR paste from clipboard OR use the button.</p>
-        <label for="imageUpload" class="upload-btn">Choose an Image File...</label>
-        <input type="file" id="imageUpload" accept="image/*">
-        <img id="preview" alt="Image preview">
-        <button type="button" id="cropBtn" class="preset-btn crop-btn" hidden>Crop &amp; search again</button>
-    </div>
+    <main class="window">
+        <div class="title-bar"><span>🔎 Search card art</span></div>
+        <div class="window-body">
+            <div class="tabs" role="tablist" aria-label="Ways to search">
+                <button type="button" role="tab" id="tab-image" data-tab="image" aria-controls="panel-image" aria-selected="true">Picture</button>
+                <button type="button" role="tab" id="tab-text" data-tab="text" aria-controls="panel-text" aria-selected="false">Description</button>
+                <button type="button" role="tab" id="tab-card" data-tab="card" aria-controls="panel-card" aria-selected="false">Card name</button>
+            </div>
 
-    <div class="search-pair">
-    <div class="upload-container text-search-box">
-        <h3>2. Search by Description</h3>
-        <p>Describe the art you're picturing, like "a goblin riding a bomb" or "a quiet snowy forest at night".</p>
-        <form id="textSearchForm" class="text-search-row">
-            <input type="text" id="textQuery" maxlength="200" placeholder="Describe the artwork..." aria-label="Describe the artwork" required>
-            <button type="submit" class="upload-btn">Search</button>
-        </form>
-    </div>
-
-    <div class="upload-container text-search-box">
-        <h3>3. Start from a Card</h3>
-        <p>Type a card's name or paste its Scryfall link to find art that looks like it.</p>
-        <form id="cardSearchForm" class="text-search-row">
-            <input type="text" id="cardQuery" maxlength="200" placeholder="Card name or Scryfall link..." aria-label="Card name or Scryfall link" required>
-            <button type="submit" class="upload-btn">Search</button>
-        </form>
-    </div>
-    </div>
-
-    <div class="upload-container filters-box">
-        <h3>Filters</h3>
-        <p>These apply to every search, and changing one re-runs the search you're looking at.</p>
-        <div class="controls" id="controlsContainer">
-            <div class="controls-row">
-                <span class="filter-label">Fits my deck:</span>
-                <div class="mana-row" id="colorFilter">
-                    <button type="button" class="mana-btn" data-color="W" aria-pressed="false" title="White"><img src="https://svgs.scryfall.io/card-symbols/W.svg" alt="White"></button>
-                    <button type="button" class="mana-btn" data-color="U" aria-pressed="false" title="Blue"><img src="https://svgs.scryfall.io/card-symbols/U.svg" alt="Blue"></button>
-                    <button type="button" class="mana-btn" data-color="B" aria-pressed="false" title="Black"><img src="https://svgs.scryfall.io/card-symbols/B.svg" alt="Black"></button>
-                    <button type="button" class="mana-btn" data-color="R" aria-pressed="false" title="Red"><img src="https://svgs.scryfall.io/card-symbols/R.svg" alt="Red"></button>
-                    <button type="button" class="mana-btn" data-color="G" aria-pressed="false" title="Green"><img src="https://svgs.scryfall.io/card-symbols/G.svg" alt="Green"></button>
-                    <button type="button" class="mana-btn mana-colorless" data-color="C" aria-pressed="false" title="Colourless only"><img src="https://svgs.scryfall.io/card-symbols/C.svg" alt="Colourless only"></button>
+            <div class="tab-panel" id="panel-image" role="tabpanel" aria-labelledby="tab-image">
+                <div class="drop-zone" id="dropZone">
+                    <p><strong>Drop a picture anywhere on this page</strong>, paste one, or choose a file.<br>Artwork, a screenshot of a card, a photo or a sketch all work.</p>
+                    <label for="imageUpload" class="btn btn-go">Choose a picture...</label>
+                    <input type="file" id="imageUpload" accept="image/*">
+                    <img id="preview" alt="The picture you searched with">
+                    <button type="button" id="cropBtn" class="btn" hidden>Crop &amp; search again</button>
                 </div>
             </div>
 
-            <div class="controls-row" id="typeFilter">
-                <span class="filter-label">Type:</span>
-                <button type="button" class="preset-btn type-btn" data-type="creature" aria-pressed="false">Creature</button>
-                <button type="button" class="preset-btn type-btn" data-type="land" aria-pressed="false">Land</button>
-                <button type="button" class="preset-btn type-btn" data-type="instant" aria-pressed="false">Instant/Sorcery</button>
-                <button type="button" class="preset-btn type-btn" data-type="artifact" aria-pressed="false">Artifact</button>
-                <button type="button" class="preset-btn type-btn" data-type="enchantment" aria-pressed="false">Enchantment</button>
-                <button type="button" class="preset-btn type-btn" data-type="planeswalker" aria-pressed="false">Planeswalker</button>
-                <button type="button" class="preset-btn type-btn" data-type="battle" aria-pressed="false">Battle</button>
+            <div class="tab-panel" id="panel-text" role="tabpanel" aria-labelledby="tab-text" hidden>
+                <p>Describe the art you're picturing, like "a goblin riding a bomb" or "a quiet snowy forest at night".</p>
+                <form id="textSearchForm" class="search-row">
+                    <input type="text" id="textQuery" maxlength="200" placeholder="Describe the artwork..." aria-label="Describe the artwork" required>
+                    <button type="submit" class="btn btn-go">Search</button>
+                </form>
             </div>
 
-            <div class="controls-row">
-                <label>
-                    Format:
-                    <select id="formatFilter">
-                        <option value="">Any</option>
-                        <option value="commander">Commander</option>
-                        <option value="standard">Standard</option>
-                        <option value="pioneer">Pioneer</option>
-                        <option value="modern">Modern</option>
-                        <option value="legacy">Legacy</option>
-                        <option value="vintage">Vintage</option>
-                        <option value="pauper">Pauper</option>
-                    </select>
-                </label>
-                <label title="Tokens, emblems, planes, schemes, vanguards, and Alchemy or other Arena-only cards">
-                    <input type="checkbox" id="hideOddities" checked>
-                    Hide Tokens & Oddities
-                </label>
-                <label>
-                    Results:
-                    <input type="number" id="maxResults" value="10" min="1" max="30">
-                </label>
+            <div class="tab-panel" id="panel-card" role="tabpanel" aria-labelledby="tab-card" hidden>
+                <p>Type a card's name or paste its Scryfall link to find art that looks like it.</p>
+                <form id="cardSearchForm" class="search-row">
+                    <input type="text" id="cardQuery" maxlength="200" placeholder="Card name or Scryfall link..." aria-label="Card name or Scryfall link" required>
+                    <button type="submit" class="btn btn-go">Search</button>
+                </form>
             </div>
 
-            <div class="controls-divider"></div>
+            <fieldset class="group" id="controlsContainer">
+                <legend>Filters</legend>
+                <p class="group-note">These apply to every search. Changing one re-runs the search you're looking at.</p>
 
-            <div class="controls-row">
-                <div style="display: flex; gap: 5px;">
-                    <button type="button" class="preset-btn" onclick="setPreset(0.15)">Strict</button>
-                    <button type="button" class="preset-btn" onclick="setPreset(0.25)">Standard</button>
-                    <button type="button" class="preset-btn" onclick="setPreset(0.4)">Loose</button>
+                <div class="controls-row">
+                    <span class="filter-label">Fits my deck:</span>
+                    <div class="mana-row" id="colorFilter">
+                        <button type="button" class="mana-btn" data-color="W" aria-pressed="false" title="White"><img src="https://svgs.scryfall.io/card-symbols/W.svg" alt="White"></button>
+                        <button type="button" class="mana-btn" data-color="U" aria-pressed="false" title="Blue"><img src="https://svgs.scryfall.io/card-symbols/U.svg" alt="Blue"></button>
+                        <button type="button" class="mana-btn" data-color="B" aria-pressed="false" title="Black"><img src="https://svgs.scryfall.io/card-symbols/B.svg" alt="Black"></button>
+                        <button type="button" class="mana-btn" data-color="R" aria-pressed="false" title="Red"><img src="https://svgs.scryfall.io/card-symbols/R.svg" alt="Red"></button>
+                        <button type="button" class="mana-btn" data-color="G" aria-pressed="false" title="Green"><img src="https://svgs.scryfall.io/card-symbols/G.svg" alt="Green"></button>
+                        <button type="button" class="mana-btn mana-colorless" data-color="C" aria-pressed="false" title="Colourless only"><img src="https://svgs.scryfall.io/card-symbols/C.svg" alt="Colourless only"></button>
+                    </div>
                 </div>
-                <label style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                    <span>Leniency: <span id="leniencyValue">0.25</span> <small>(image & more-like-this)</small></span>
-                    <input type="range" id="leniencySlider" min="0.05" max="0.5" step="0.01" value="0.25" style="width: 120px;">
-                </label>
-            </div>
+
+                <div class="controls-row">
+                    <span class="filter-label">Type:</span>
+                    <div class="toggle-row" id="typeFilter">
+                        <button type="button" class="btn type-btn" data-type="creature" aria-pressed="false">Creature</button>
+                        <button type="button" class="btn type-btn" data-type="land" aria-pressed="false">Land</button>
+                        <button type="button" class="btn type-btn" data-type="instant" aria-pressed="false">Instant/Sorcery</button>
+                        <button type="button" class="btn type-btn" data-type="artifact" aria-pressed="false">Artifact</button>
+                        <button type="button" class="btn type-btn" data-type="enchantment" aria-pressed="false">Enchantment</button>
+                        <button type="button" class="btn type-btn" data-type="planeswalker" aria-pressed="false">Planeswalker</button>
+                        <button type="button" class="btn type-btn" data-type="battle" aria-pressed="false">Battle</button>
+                    </div>
+                </div>
+
+                <div class="controls-row">
+                    <label>
+                        <span class="filter-label">Format:</span>
+                        <select id="formatFilter">
+                            <option value="">Any</option>
+                            <option value="commander">Commander</option>
+                            <option value="standard">Standard</option>
+                            <option value="pioneer">Pioneer</option>
+                            <option value="modern">Modern</option>
+                            <option value="legacy">Legacy</option>
+                            <option value="vintage">Vintage</option>
+                            <option value="pauper">Pauper</option>
+                        </select>
+                    </label>
+                    <label title="Tokens, emblems, planes, schemes, vanguards, and Alchemy or other Arena-only cards">
+                        <input type="checkbox" id="hideOddities" checked>
+                        Hide tokens &amp; oddities
+                    </label>
+                    <label>
+                        Show
+                        <input type="number" id="maxResults" value="10" min="1" max="30">
+                        results
+                    </label>
+                </div>
+
+                <div class="controls-row" title="How far off a match can be. Applies to picture and more-like-this searches.">
+                    <span class="filter-label">Leniency:</span>
+                    <div class="toggle-row">
+                        <button type="button" class="btn preset-btn" data-preset="0.15" aria-pressed="false" onclick="setPreset(0.15)">Strict</button>
+                        <button type="button" class="btn preset-btn" data-preset="0.25" aria-pressed="false" onclick="setPreset(0.25)">Standard</button>
+                        <button type="button" class="btn preset-btn" data-preset="0.4" aria-pressed="false" onclick="setPreset(0.4)">Loose</button>
+                    </div>
+                    <input type="range" id="leniencySlider" min="0.05" max="0.5" step="0.01" value="0.25" aria-label="Leniency">
+                    <span id="leniencyValue">0.25</span>
+                    <span>(picture and more-like-this searches)</span>
+                </div>
+            </fieldset>
         </div>
-    </div>
+    </main>
 
-    <h3 id="resultsHeading">4. Match Results</h3>
-    <div id="loading" class="loader"></div>
-    <div id="results"></div>
+    <section class="window" id="resultsWindow" hidden>
+        <div class="title-bar"><span id="resultsHeading">Results</span></div>
+        <div class="window-body">
+            <div id="loading" class="loader" role="status" aria-label="Searching"></div>
+            <div id="results"></div>
+        </div>
+    </section>
 
     <div class="zoom-overlay" id="zoomOverlay">
-        <div class="zoom-card-container">
-            <div class="inspector-name" id="inspectorName">Card Name</div>
-            <img id="zoomImage" src="" alt="Zoomed card">
-            <div class="inspector-score" id="inspectorScore">Score: 00.0%</div>
-            <button class="flip-btn" id="flipBtn">Flip Back Face</button>
+        <div class="zoom-card-container" role="dialog" aria-labelledby="inspectorName">
+            <div class="title-bar">
+                <span id="inspectorName">Card</span>
+                <button class="bg-window-close" aria-label="Close" onclick="closeZoomOverlay()">X</button>
+            </div>
+            <img id="zoomImage" src="" alt="The card, enlarged">
+            <div class="zoom-footer">
+                <div class="inspector-score" id="inspectorScore"></div>
+                <button class="btn flip-btn" id="flipBtn">Flip (Back Face)</button>
+            </div>
         </div>
     </div>
 
     <footer class="app-footer">
+        <a href="https://ko-fi.com/sonriso" target="_blank" rel="noopener" class="btn start-btn">☕ Support the server</a>
         <p>Keeping this awake costs money.</p>
-        <a href="https://ko-fi.com/sonriso" target="_blank" rel="noopener" class="donate-link">☕ Support the Server</a>
+        <button type="button" class="btn" onclick="document.getElementById('achievementsModal').style.display='block'">Achievements</button>
+        <span class="tray">Scans: <span id="scan-count-display">0</span></span>
     </footer>
 
     <script>
@@ -1185,6 +652,22 @@
         const textSearchForm = document.getElementById('textSearchForm');
         const textQuery = document.getElementById('textQuery');
         const resultsHeading = document.getElementById('resultsHeading');
+
+        const resultsWindow = document.getElementById('resultsWindow');
+
+        // -- TABS: the three ways to search share one window --
+        const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
+        function selectTab(name) {
+            tabs.forEach(tab => {
+                const selected = tab.dataset.tab === name;
+                tab.setAttribute('aria-selected', String(selected));
+                document.getElementById(`panel-${tab.dataset.tab}`).hidden = !selected;
+            });
+        }
+        tabs.forEach(tab => tab.addEventListener('click', () => {
+            selectTab(tab.dataset.tab);
+            document.querySelector(`#panel-${tab.dataset.tab} input[type="text"]`)?.focus();
+        }));
 
         let currentZoomCardData = null;
         let showingBackFace = false;
@@ -1222,7 +705,7 @@
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
             toast.className = 'retro-toast';
-            toast.innerHTML = `<span style="color:var(--accent-orange)">ACHIEVEMENT UNLOCKED!</span><br>${icon} ${title}`;
+            toast.innerHTML = `<strong>Achievement unlocked</strong><br>${icon} ${title}`;
             container.appendChild(toast);
             setTimeout(() => toast.remove(), 5000);
         }
@@ -1305,13 +788,21 @@
             if(slider && display) {
                 slider.value = val;
                 display.innerText = val.toFixed(2);
+                markPreset();
                 if (val >= parseFloat(slider.max)) unlockAchievement('giant_bee');
                 onFilterChange();
             }
         }
 
+        function markPreset() {
+            const value = parseFloat(document.getElementById('leniencySlider').value);
+            document.querySelectorAll('.preset-btn').forEach(b => b.setAttribute('aria-pressed', String(parseFloat(b.dataset.preset) === value)));
+        }
+        markPreset();
+
         document.getElementById('leniencySlider').addEventListener('input', function() {
             document.getElementById('leniencyValue').innerText = parseFloat(this.value).toFixed(2);
+            markPreset();
         });
 
         controlsContainer.addEventListener('click', e => e.stopPropagation());
@@ -1328,18 +819,19 @@
 
         // -- DRAG & DROP LOGIC --
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
+            document.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
         });
 
         ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
+            document.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
         });
 
         ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
+            document.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
         });
 
-        dropZone.addEventListener('drop', e => {
+        // A picture can be dropped anywhere on the page, whichever tab is showing.
+        document.addEventListener('drop', e => {
             const dt = e.dataTransfer;
             if (dt.files && dt.files.length > 0) handleImageUpload(dt.files[0]);
         }, false);
@@ -1457,6 +949,7 @@
             activeSearch?.abort();
             const search = activeSearch = new AbortController();
             closePrintings();  // its tile is about to be replaced
+            resultsWindow.hidden = false;
 
             const maxResults = parseInt(document.getElementById('maxResults').value, 10) || 10;
 
@@ -1601,6 +1094,7 @@
         function handleImageUpload(file, { cropped = false } = {}) {
             if (!file) return;
             if (!cropped) originalUpload = file;
+            selectTab('image');  // a drop or paste can arrive while another tab is showing
             if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);  // free the last upload
             preview.src = URL.createObjectURL(file);
             preview.style.display = 'block';
@@ -1690,6 +1184,7 @@
             query = query.trim();
             if (!query) return;
             textQuery.value = query;
+            selectTab('text');  // a shared ?q= link opens on this tab
             preview.style.display = 'none';
             cropBtn.hidden = true;
 
@@ -1737,6 +1232,7 @@
             activeSearch?.abort();
             const search = activeSearch = new AbortController();
             closePrintings();
+            resultsWindow.hidden = false;
             resultsContainer.innerHTML = '';
             loading.style.display = 'block';
             const fail = text => { loading.style.display = 'none'; showResultsMessage(text); };
