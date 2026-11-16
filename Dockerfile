@@ -4,7 +4,7 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 HF_HOME=/app/.hf-cache
 
 # CPU-only torch first: the default PyPI wheel bundles several GB of CUDA libraries this server can't use.
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 

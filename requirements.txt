@@ -1,9 +1,13 @@
-fastapi
-uvicorn[standard]
-python-multipart
-sentence-transformers
-faiss-cpu
-numpy
-Pillow
-requests
-tqdm
+# Pinned to the set the weekly refresh passed its checks with on 2026-11-16.
+# To upgrade: bump here (and torch in the Dockerfile and refresh-index.yml), then run
+# Actions -> Refresh card index with "check_anyway" ticked before trusting it.
+fastapi==0.163.1
+uvicorn[standard]==0.54.0
+python-multipart==0.0.34
+sentence-transformers==6.3.0
+transformers==5.23.0  # not imported directly, but it does the embedding; a change here can shift every score
+faiss-cpu==1.16.0
+numpy==2.5.5
+Pillow==13.0.0
+requests==2.34.2
+tqdm==4.70.1
